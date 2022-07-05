@@ -119,10 +119,6 @@ export class RootComponent implements OnInit, OnDestroy {
     return environment.production;
   }
 
-  public get isnightly(): boolean {
-    return environment.nightlyBuild;
-  }
-
   public reconnect(): void {
     this.client.reconnect();
   }
