@@ -151,13 +151,7 @@ export class GroupComponent implements OnInit, OnDestroy {
   }
 
   private flashGroup() {
-
-    console.log("autoHide: " + this.isAutoHide);
-    console.log("connectionStateChange: " + this.clientService.connectionStateChange.value);
-
     if (this.isAutoHide && this.clientService.connectionStateChange.value) {
-      
-      console.log("isShown: " + this.isShown);
       if (!this.isShown) {
         this.isShown = true;
       }
@@ -166,13 +160,10 @@ export class GroupComponent implements OnInit, OnDestroy {
         this.timerSubscription.unsubscribe();
       }
 
-      console.log("active: " + this.active);
       if (!this.active) {
         let timerLength = this.settings.getAutoHideTime() * 1000;
         let source = timer(timerLength);
-        console.log(timerLength);
         this.timerSubscription = source.subscribe(() => {
-          console.log("bye hud");
           this.isShown = false;
         })
       }
