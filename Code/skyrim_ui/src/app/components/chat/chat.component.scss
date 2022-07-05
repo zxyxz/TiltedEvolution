@@ -1,3 +1,5 @@
+@use "sass:math";
+
 @import 'env';
 
 @import 'functions/mod';
@@ -20,7 +22,7 @@ app-chat {
   p {
     margin: 0;
     line-height: $-size-line;
-    padding: ($-size-gap / 5) ($-size-gap / 2);
+    padding: math.div($-size-gap, 5) math.div($-size-gap, 2);
     text-align: left;
 
     &[data-odd=true] {

@@ -62,7 +62,7 @@ export class ClientService implements OnDestroy {
   public partyInfoChange = new Subject<PartyInfo>();
 
   /** Connect party info change. */
-  public partyLeftChange = new Subject();
+  public partyLeftChange = new Subject<void>();
 
   /** Connect party invite received. */
   public partyInviteReceivedChange = new Subject<number>();
@@ -88,12 +88,12 @@ export class ClientService implements OnDestroy {
   public triggerError = new BehaviorSubject('');
 
   /** Used purely for debugging. */
-  public debugChange = new Subject();
+  public debugChange = new Subject<void>();
 
   // The below emitters are used in the mocking service
 
   /** Used for when a party leader changed. */
-  public partyLaunchedChange = new Subject();
+  public partyLaunchedChange = new Subject<void>();
 
   /** Used for when a party invite is sent. */
   public partyInviteChange = new Subject<number>();

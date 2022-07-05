@@ -13,7 +13,7 @@ import { ClientService } from '../../services/client.service';
 })
 export class DisconnectComponent {
   @Output()
-  public done = new EventEmitter();
+  public done = new EventEmitter<void>();
 
   public constructor(private client: ClientService, private sound: SoundService) {}
 

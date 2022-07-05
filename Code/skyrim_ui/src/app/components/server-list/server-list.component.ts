@@ -20,7 +20,7 @@ import { Server } from '../../models/server';
 export class ServerListComponent implements OnInit, OnDestroy {
 
   @Output()
-  public done = new EventEmitter();
+  public done = new EventEmitter<void>();
   @Output()
   public setView = new EventEmitter<string>();
 

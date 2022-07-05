@@ -17,7 +17,7 @@ import { ErrorService } from '../../services/error.service';
 })
 export class ConnectComponent implements OnDestroy, AfterViewInit {
   @Output()
-  public done = new EventEmitter();
+  public done = new EventEmitter<void>();
   @Output()
   public setView = new EventEmitter<string>();
 

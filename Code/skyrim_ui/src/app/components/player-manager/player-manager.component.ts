@@ -9,7 +9,7 @@ import { Component, EventEmitter, HostListener, OnDestroy, OnInit, Output, ViewE
 export class PlayerManagerComponent implements OnInit, OnDestroy {
 
   @Output()
-  public done = new EventEmitter();
+  public done = new EventEmitter<void>();
 
   constructor() { }
 

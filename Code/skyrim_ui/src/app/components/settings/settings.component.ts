@@ -11,7 +11,7 @@ import { SettingService } from "src/app/services/setting.service";
 export class SettingsComponent implements OnInit, OnDestroy {
 
     @Output()
-    public done = new EventEmitter();
+    public done = new EventEmitter<void>();
     @Output()
     public setView = new EventEmitter<string>();
 

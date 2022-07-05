@@ -1,3 +1,5 @@
+@use "sass:math";
+
 @import 'env';
 
 @import 'functions/mod';
@@ -15,7 +17,7 @@ app-notifications {
 
 .app-notifications-icon {
   flex: 0 0 1rem;
-  margin-right: $-size-gap / 2;
+  margin-right: math.div($-size-gap, 2);
   background: url(../../../assets/images/arrow/east.svg) center / contain no-repeat;
 }
 
