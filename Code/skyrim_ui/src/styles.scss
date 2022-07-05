@@ -1,3 +1,4 @@
+@use "sass:math";
 @import 'functions/mod';
 @import 'functions/rem';
 
@@ -50,7 +51,7 @@ input:not([type=checkbox]),
 textarea,
 select {
   display: block;
-  padding: $-size-gap / 2;
+  padding: math.div($-size-gap, 2);
   background: transparent;
   color: mod($-color-background, 1);
   border: rem($-size-font, 2px) solid;
@@ -72,7 +73,7 @@ button {
   font-size: 1rem;
   text-transform: uppercase;
   background: transparent;
-  padding: $-size-gap / 2;
+  padding: math.div($-size-gap, 2);
   color: mod($-color-background, 1);
 
   &:hover:not([disabled]),
@@ -132,11 +133,11 @@ button {
     }
 
     &::before {
-      margin-right: $-size-gap / 2;
+      margin-right: math.div($-size-gap, 2);
     }
 
     &::after {
-      margin-left: $-size-gap / 2;
+      margin-left: math.div($-size-gap, 2);
     }
   }
 
