@@ -1,3 +1,36 @@
+## [1.38.3](https://github.com/tiltedphoques/TiltedEvolution/compare/v1.38.2...v1.38.3) (2022-07-01)
+
+## [1.38.2](https://github.com/tiltedphoques/TiltedEvolution/compare/v1.38.1...v1.38.2) (2022-06-29)
+
+## [1.38.1](https://github.com/tiltedphoques/TiltedEvolution/compare/v1.38.0...v1.38.1) (2022-06-28)
+
+
+### Bug Fixes
+
+* disable buttons for non leader ([c2a4221](https://github.com/tiltedphoques/TiltedEvolution/commit/c2a4221ea86a05f75a81955eac79096da4bcc67c))
+* group ui not showing up ([02b2ec6](https://github.com/tiltedphoques/TiltedEvolution/commit/02b2ec6c526b65419cc170f7cfa8ac9ad3aebb5f))
+* pw protected servers showing on list ([bb55224](https://github.com/tiltedphoques/TiltedEvolution/commit/bb55224ac6495751b4d4e7e435dc1d277c1f6cc0))
+
+# [1.38.0](https://github.com/tiltedphoques/TiltedEvolution/compare/v1.37.1...v1.38.0) (2022-06-27)
+
+
+### Bug Fixes
+
+* healthbar not always showing ([e4bbba7](https://github.com/tiltedphoques/TiltedEvolution/commit/e4bbba7a20667305542513f462abd51888324499))
+* invite buttons after relaunch party ([a942002](https://github.com/tiltedphoques/TiltedEvolution/commit/a9420021799dea7cfc2732e1d5089a012886af8b))
+* owner undefined check ([65a2df8](https://github.com/tiltedphoques/TiltedEvolution/commit/65a2df80461e32410078fe890ac8b83648f74b91))
+* player unload event ([6616036](https://github.com/tiltedphoques/TiltedEvolution/commit/661603653ebc9a11c5db09572d706d52db9a1cf0))
+* re-enable invite buttons ([b5450d5](https://github.com/tiltedphoques/TiltedEvolution/commit/b5450d5b9269e56fc80b52746e8d41fd16e0fb1a))
+* teleport button ([e286d26](https://github.com/tiltedphoques/TiltedEvolution/commit/e286d268fe3d92d5a0aea094921fa4803b6f99d5))
+* ui not showing sometimes ([d58d771](https://github.com/tiltedphoques/TiltedEvolution/commit/d58d7719bd3a8879982510faad50fcb70cf7e1f9))
+
+
+### Features
+
+* better party auto-hide and ui logic ([1a300ab](https://github.com/tiltedphoques/TiltedEvolution/commit/1a300ab2bd02d86bff891498a61626d5cd3bee55))
+* password protected servers ([b7676de](https://github.com/tiltedphoques/TiltedEvolution/commit/b7676ded513d7805fa81586f605c1f8a90ec7707))
+* UI mock service ([151ffba](https://github.com/tiltedphoques/TiltedEvolution/commit/151ffba312e0556862409cdc9ef29a29bccc1955))
+
 ## [1.37.1](https://github.com/tiltedphoques/TiltedEvolution/compare/v1.37.0...v1.37.1) (2022-06-23)
 
 
