@@ -163,7 +163,9 @@ export class GroupComponent implements OnInit, OnDestroy {
       if (!this.active) {
         let timerLength = this.settings.getAutoHideTime() * 1000;
         let source = timer(timerLength);
+        console.log(timerLength);
         this.timerSubscription = source.subscribe(() => {
+          console.log("bye hud");
           this.isShown = false;
         })
       }
