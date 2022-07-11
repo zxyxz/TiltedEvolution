@@ -3,15 +3,15 @@
 <input class="searchListServer" [formControl]="formSearch" type="text" placeholder="Search..."
   autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
 
-  <button class="buttonsServerList" (click)="updateServerList()">Refresh</button>
-  <button class="buttonsServerList" (click)="cancel()">Back</button>
+  <button class="buttonsServerList" (click)="updateServerList()">刷新</button>
+  <button class="buttonsServerList" (click)="cancel()">返回</button>
 
 <div *ngIf="isLoading; else notLoading">
-  Loading...
+  加载中...
 </div>
 <ng-template #notLoading>
   <div id="noserv" *ngIf="!isLoading && serverList.length === 0; else notEmpty">
-    No public server available
+    没有可用的服务器
   </div>
 
   <ng-template #notEmpty>
@@ -19,11 +19,11 @@
       <table cellspacing="5" cellpadding="5" class="serverslisttable">
         <thead class="listHeader">
           <tr>
-            <th>Server Name<app-order [isIncreasingOrder]="isIncreasingNameOrder" (sorted)="sortName($event)"></app-order></th>
-            <th>Players<app-order [isIncreasingOrder]="isIncreasingPlayerOrder" (sorted)="sortPlayers($event)"></app-order></th>
-            <th>Country<app-order [isIncreasingOrder]="isIncreasingCountryOrder" (sorted)="sortCountry($event)"></app-order></th>
+            <th>服务名称<app-order [isIncreasingOrder]="isIncreasingNameOrder" (sorted)="sortName($event)"></app-order></th>
+            <th>玩家数<app-order [isIncreasingOrder]="isIncreasingPlayerOrder" (sorted)="sortPlayers($event)"></app-order></th>
+            <th>国家<app-order [isIncreasingOrder]="isIncreasingCountryOrder" (sorted)="sortCountry($event)"></app-order></th>
             <th>{{ getClientVersion() }}</th>
-            <th>Favorite<app-order [isIncreasingOrder]="isIncreasingFavoriteOrder" (sorted)="sortFavorite($event)"></app-order></th> <!-- Pls not automatic fav on top, make it sortable like other titles, thanks! -->
+            <th>收藏<app-order [isIncreasingOrder]="isIncreasingFavoriteOrder" (sorted)="sortFavorite($event)"></app-order></th> <!-- Pls not automatic fav on top, make it sortable like other titles, thanks! -->
             <th></th>
           </tr>
         </thead>
@@ -34,7 +34,7 @@
             <td>{{ server.country }}</td>
             <td [ngClass]="isCompatibleToClient(server) ? 'server-compatible' : 'server-incompatible'">{{ getServerVersion(server) }}</td>
             <td (click)="toggleServerFavorite(server)" class="app-server-list-notfavorite"><fa-icon [icon]="getFavoriteIcon(server)"></fa-icon></td>
-            <td><button (click)="connect(server)" class="joinbutton" [disabled]="!isCompatibleToClient(server)">Join</button></td>
+            <td><button (click)="connect(server)" class="joinbutton" [disabled]="!isCompatibleToClient(server)">加入</button></td>
           </tr>
         </tbody>
       </table>
