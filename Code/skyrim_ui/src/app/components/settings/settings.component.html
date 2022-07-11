@@ -1,30 +1,30 @@
 <div class="container">
     <div class="settings">
 
-        <h2>Audio</h2>
+        <h2>音量</h2>
         <div class="flex-item">
-            <label for="muted">Mute UI</label>
+            <label for="muted">UI静音</label>
             <input id="muted" type="checkbox" [value]="muted" [checked]="muted" (change)="onMutedChange($event)">
         </div>
         <div class="flex-item">
-            <label for="volume">UI Volume</label>
+            <label for="volume">UI音量</label>
             <input id="volume" class="volumeSlider" type="range" min="0.0" max="1.0" step="0.1" [value]="volume"
                 (change)="onVolumeChange($event)">
         </div>
         <hr>
-        <h2>Party</h2>
+        <h2>队伍</h2>
         <div class="flex-item">
-            <label for="showParty">Show Party</label>
+            <label for="showParty">显示队伍</label>
             <input id="showParty" type="checkbox" [value]="showParty" [checked]="showParty" [disabled]="autoHideParty"
                 (change)="onShowPartyChange($event)">
         </div>
         <div class="flex-item">
-            <label for="autoHideParty">Auto Hide Party</label>
+            <label for="autoHideParty">自动隐藏队伍</label>
             <input id="autoHideParty" type="checkbox" [value]="autoHideParty" [checked]="autoHideParty"
                 (change)="onAutoHidePartyChange($event)">
         </div>
         <div class="flex-item">
-            <label>Auto Hide Timer Length</label>
+            <label>时隔多久隐藏</label>
             <div class="radioBtn">
                 <label for="autoHideTime1">1s</label>
                 <input id="autoHideTime1" type="radio" value="1" name="autoHideTime" [checked]="autoHideTimeSelected(1)" (change)="onAutoHideTimeChange($event)" [disabled]="!autoHideParty">
@@ -35,15 +35,15 @@
             </div>
         </div>
         <hr>
-        <h2>Debug</h2>
+        <h2>调试</h2>
         <div class="flex-item">
-            <label for="showDebug">Show Debug Information</label>
+            <label for="showDebug">展示调试信息</label>
             <input id="showDebug" type="checkbox" [value]="showDebug" [checked]="showDebug"
                 (change)="onShowDebugChange($event)">
         </div>
         <hr>
     </div>
     <div class="buttons">
-        <button class="btnCancel" (click)="cancel()">Back</button>
+        <button class="btnCancel" (click)="cancel()">返回</button>
     </div>
 </div>

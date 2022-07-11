@@ -1,23 +1,24 @@
 <div id="notInParty" *ngIf="!group.isEnabled ; else inParty">
-  <button class="party-menu-button" (click)="launchParty()" [disabled]="isLaunchPartyDisabled()">Launch party</button>
+  <button class="party-menu-button" (click)="launchParty()" [disabled]="isLaunchPartyDisabled()">创建队伍</button>
   <button *ngFor="let player of invitees | keyvalue" class="party-menu-button"
-    (click)="acceptPartyInvite(player.value.id)">Accept invite from {{ player.value.name }}</button>
+    (click)="acceptPartyInvite(player.value.id)">接受来自 {{ player.value.name }} 的组队邀请</button>
   
   <hr class="solid">
   
-  <p style="padding-top: 0.5rem; line-height: 1.3;">For an optimal questing experience, make sure to read the playguide on our wiki, which you can find through our website, <b>skyrim-together.com</b>. Here is a small summary of the guidelines:</p>
+  <p style="padding-top: 0.5rem; line-height: 1.3;">liangchen提示:为了获得最佳游戏体验,请牢记以下目前还没有过时的游玩技巧:</p>
   <ul>
-    <li style="line-height: 1.3em; height: auto;">By creating a party, you sort of become the "host", aka the party leader.</li>
-    <li style="line-height: 1.3em; height: auto;">Only the party leader can talk to quest NPCs to progress quests.</li>
-    <li style="line-height: 1.3em; height: auto;">Only the party leader can loot quest items.</li>
-    <li style="line-height: 1.3em; height: auto;">Stick to one party leader per playthrough.</li>
-    <li style="line-height: 1.3em; height: auto;">Stick to one party per server.</li>
+    <li style="line-height: 1.3em; height: auto;">创建一个队伍,队长就像是"主机"</li>
+    <li style="line-height: 1.3em; height: auto;">只有队长可以与任务npc对话来推进任务。</li>
+    <li style="line-height: 1.3em; height: auto;">只有队长才能去拾取关键任务物品(龙石啥的)</li>
+    <li style="line-height: 1.3em; height: auto;">建议在这场奇妙的联机之旅中,每次都保证你的队长是同一个人(不然就得同步任务进度再组队)</li>
+    <li style="line-height: 1.3em; height: auto;">如果人少,建议服务器上只有一只队伍</li>
+    <li style="line-height: 1.3em; height: auto;">等队长先进地图,队员后进,保证怪物是从队长同步的</li>
   </ul>
 </div>
 
 <ng-template #inParty>
   <div style="margin-bottom: 1.0rem;" id="noPlayers" *ngIf="getMembersLength === 0 ; else notEmpty">
-    <span>There is nobody in your party yet. Invite them through the player list!</span>
+    <span>你的队伍里还没有人,请邀请玩家加入</span>
   </div>
 
   <ng-template #notEmpty>
@@ -26,8 +27,8 @@
         <thead class="listHeader">
           <tr>
             <th></th>
-            <th>Name</th>
-            <th>Location</th>
+            <th>名称</th>
+            <th>位置</th>
             <th></th>
             <th></th>
             <!--<th></th>-->
@@ -38,9 +39,9 @@
             <td>{{ player.value.level }}</td>
             <td>{{ player.value.name }}</td>
             <td>{{ player.value.cellName }}</td>
-            <td><button (click)="teleportToPlayer(player.value.id)" class="teleBtn">Teleport</button></td>
+            <td><button (click)="teleportToPlayer(player.value.id)" class="teleBtn">传送</button></td>
             <td><button (click)="kickMember(player.value.id)" [disabled]="!isPartyLeader" class="teleBtn"
-                [ngClass]="!isPartyLeader ? 'hidden' : ''">Kick</button></td>
+                [ngClass]="!isPartyLeader ? 'hidden' : ''">踢出</button></td>
             <!--
             <td><button (click)="changeLeader(player.value.id)" [disabled]="!isPartyLeader" class="teleBtn"
                 [ngClass]="!isPartyLeader ? 'hidden' : ''">Make
@@ -52,5 +53,5 @@
     </div>
   </ng-template>
 
-  <button class="party-menu-button btn" (click)="leave()">Leave party</button>
+  <button class="party-menu-button btn" (click)="leave()">离开队伍</button>
 </ng-template>

@@ -1,5 +1,5 @@
 <div id="noPlayers" *ngIf="getListLength() === 0 ; else notEmpty">
-  <span>Nobody here but us chickens!</span>
+  <span>很明显,服务器里只有你自己!</span>
 </div>
 
 <ng-template #notEmpty>
@@ -8,8 +8,8 @@
       <thead class="listHeader">
         <tr>
           <th></th>
-          <th>Name</th>
-          <th>Location</th>
+          <th>名称</th>
+          <th>位置</th>
           <th></th>
         </tr>
       </thead>
@@ -18,7 +18,7 @@
           <td>{{ player.value.level }}</td>
           <td>{{ player.value.name }}</td>
           <td>{{ player.value.cellName }}</td>
-          <td><button (click)="sendPartyInvite(player.value.id)" [disabled]="player.value.hasBeenInvited || isMember(player.value.id) || !isPartyLeader" [ngClass]="hideInviteBtn(player.value.id) ? 'hidden' : ''" class="teleBtn">Invite</button></td>
+          <td><button (click)="sendPartyInvite(player.value.id)" [disabled]="player.value.hasBeenInvited || isMember(player.value.id) || !isPartyLeader" [ngClass]="hideInviteBtn(player.value.id) ? 'hidden' : ''" class="teleBtn">邀请</button></td>
         </tr>
       </tbody>
     </table>

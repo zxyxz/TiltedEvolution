@@ -14,23 +14,23 @@
   <div [@controls]="active" [ngClass]="connected ? 'app-root-controls-wide' : 'app-root-controls'">
     <app-window *ngIf="isProduction || isnightly || connected || currentUser" border="strip" class="app-root-menu">
       <button *ngIf="!connected && !isConnectionInProgress" (click)="view = 'connect'" data-style-ornament="inverted"
-        [attr.data-style-active]="view === 'connect'">Connect</button>
+        [attr.data-style-active]="view === 'connect'">连接</button>
       <ng-container *ngIf="connected">
         <button (click)="view = 'disconnect'" data-style-ornament="inverted"
-          [attr.data-style-active]="view === 'disconnect'">Disconnect</button>
+          [attr.data-style-active]="view === 'disconnect'">断开连接</button>
         <!--
           <button (click)="reconnect()" data-style-ornament="inverted"
           [attr.data-style-active]="view === 'reconnect'">Reconnect</button>
         -->
         <button (click)="view = 'playerManager'" data-style-ornament="inverted" [attr.data-style-active]="view === 'playerManager'">
-          Player Manager
+          玩家管理
         </button>
       </ng-container>
       <button (click)="view = 'settings'" data-style-ornament="inverted" [attr.data-style-active]="view === 'settings'">
-        Settings
+        设置
       </button>
       <button *ngIf="isConnectionInProgress" (click)="view = 'disconnect'" data-style-ornament="inverted"
-        [attr.data-style-active]="view === 'disconnect'">Connection in progress</button>
+        [attr.data-style-active]="view === 'disconnect'">连接中</button>
     </app-window>
     <app-window class="app-root-chat">
       <app-chat #chat></app-chat>
