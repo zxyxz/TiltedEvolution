@@ -33,23 +33,23 @@ jobs:
         xmake-version: '2.6.5'
 
     # Install node
-    #- name: Setup nodejs
-    #  uses: actions/setup-node@v2
-    #  with:
-    #    cache: npm
-    #    node-version: 16
+    - name: Setup nodejs
+      uses: actions/setup-node@v2
+      with:
+        cache: npm
+        node-version: 16
 
-    #- name: Update xmake repository
-    #  run: xmake.exe repo --update
+    - name: Update xmake repository
+      run: xmake.exe repo --update
 
-    #- name: Cache dependencies
-    #  uses: actions/cache@v2
-    #  with:
-    #    path: C:\Users\runneradmin\AppData\Local\.xmake\packages
-    #    key: v2-${{ runner.os }}-${{ matrix.arch }}-${{ matrix.mode }}-${{ hashFiles('xmake.lua') }}-${{ hashFiles('C:\Users\runneradmin\AppData\Local\.xmake\xmake.conf') }}-${{ hashFiles('C:\Users\runneradmin\AppData\Local\.xmake\repositories\**') }}
+    - name: Cache dependencies
+      uses: actions/cache@v2
+      with:
+        path: C:\Users\runneradmin\AppData\Local\.xmake\packages
+        key: v2-${{ runner.os }}-${{ matrix.arch }}-${{ matrix.mode }}-${{ hashFiles('xmake.lua') }}-${{ hashFiles('C:\Users\runneradmin\AppData\Local\.xmake\xmake.conf') }}-${{ hashFiles('C:\Users\runneradmin\AppData\Local\.xmake\repositories\**') }}
 
-    #- name: Prepare npm
-    #  run: npm install @semantic-release/github @semantic-release/exec conventional-changelog-conventionalcommits
+    - name: Prepare npm
+      run: npm install @semantic-release/github @semantic-release/exec conventional-changelog-conventionalcommits
 
     # Delete old releases
     #- name: Remove old releases
@@ -61,10 +61,10 @@ jobs:
     #    GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
     # Release version
-    #- name: Release version
-    #  run: npx semantic-release
-    #  env:
-    #    GH_TOKEN: ${{ secrets.GH_TOKEN }}
+    - name: Release version
+      run: npx semantic-release
+      env:
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
     - name: Configure xmake and install dependencies
       run: xmake.exe config --arch=${{ matrix.arch }} --mode=${{ matrix.mode }} --yes --vs_sdkver=10.0.19041.0 -vD
@@ -74,11 +74,11 @@ jobs:
       run: xmake.exe
 
     # Create install
-    #- name: Bundle package
-    #  run: xmake.exe install -o packaged
+    - name: Bundle package
+      run: xmake.exe install -o packaged
 
     # Upload artifacts
-    #- uses: actions/upload-artifact@v2
-    #  with:
-    #    name: ${{ matrix.os }}-${{ matrix.arch }}-${{ matrix.mode }}
-    #    path: packaged/bin/**
+    - uses: actions/upload-artifact@v2
+      with:
+        name: ${{ matrix.os }}-${{ matrix.arch }}-${{ matrix.mode }}
+        path: packaged/bin/**
