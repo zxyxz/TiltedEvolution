@@ -1,0 +1,156 @@
+{
+  "INFO": "不要修改en.json文件! 修改overwrite.json 文件内容即可!",
+
+  "COMPONENT": {
+    "CHAT": {
+      "SEND": "发送",
+      "MESSAGE": "消息",
+      "MESSAGE_TOO_LONG": "你发的消息长度超过了限制 {{chatMessageLengthLimit}} 字符."
+    },
+    "CONNECT": {
+      "INFO": {
+        "SERVER_ADDRESS": "连接服务器地址 比如 <strong>127.0.0.1:10578</strong>. 端口默认是 <strong>10578</strong>,可以不填.",
+        "HELGEN": "在你做完开局新手指引 逃离海耳根(Helgen)之前，不要连接上服务器."
+      },
+      "ADDRESS": "服务器地址",
+      "PASSWORD": "密码(默认为空)",
+      "SAVE_PASSWORD": "保存密码?",
+      "CONNECT": "连接",
+      "CANCEL": "取消",
+      "PUBLIC_SERVERS": "公共服务器列表",
+      "ERROR": {
+        "CONNECTION": "无法连接到指定的服务器。请确保您输入了正确的地址，并且没有遇到网络问题.",
+        "VERSION_MISMATCH": "你不能连接到服务器，因为服务器版本和你的本地客户端版本不一致.",
+        "INVALID_ADDRESS": "服务器地址格式无效."
+      }
+    },
+    "DISCONNECT": {
+      "PROMPT": "您确定要断开连接吗?",
+      "PROCEED": "确定",
+      "CANCEL": "取消"
+    },
+    "ERROR": {
+      "OK": "Ok"
+    },
+    "NOTIFICATIONS": {
+      "MESSAGE_FROM": "收到消息从"
+    },
+    "PARTY_MENU": {
+      "ACCEPT_INVITE": "接受来自 {{name}} 的组队邀请",
+      "LAUNCH_PARTY": "创建队伍",
+      "INVITES": "邀请列表",
+      "NO_INVITES": "您没有任何邀请",
+      "EXPERIENCE_WARNING": "有问题可以上我们的官网看看, <b>skyrim-together.com</b>. (liangchen:下面是目前还没过时的稳定联机指导)",
+      "GUIDELINES": {
+        "PARTY": "一个队伍的队长就像主机,npc和怪物都是从队长同步的,每次进地图,一定得让队长先进!",
+        "PARTY_LEADER_TALK": "只有队长可以与任务npc对话来推进任务.",
+        "PARTY_LEADER_LOOT_QUESTITEMS": "只有队长可以收集任务战利品.",
+        "KEEP_PARTY_LEADER": "最好每次联机保持同一个队长,因为得确保任务进度一致再组队.",
+        "ONE_PARTY_PER_SERVER": "经常快速存档，一旦崩溃了,那么得加载一个没有崩溃的存档,不然后面崩溃的概率还是很高"
+      },
+      "NO_PLAYERS_IN_PARTY": "你的队伍里还没有人呢。通过玩家列表邀请他们!",
+      "TABLE_HEADERS": {
+        "LEVEL": "Lv.",
+        "NAME": "名称",
+        "LOCATION": "位置"
+      },
+      "ACTIONS": {
+        "KICK": "踢出",
+        "TELEPORT": "传送",
+        "MAKE_LEADER": "转让队长"
+      },
+      "LEAVE_PARTY": "离开队伍"
+    },
+    "PARTY_LIST": {
+      "NO_OTHER_PLAYERS": "很明显服务器里只有你自己!",
+      "TABLE_HEADERS": {
+        "LEVEL": "Lv.",
+        "NAME": "名称",
+        "LOCATION": "位置"
+      },
+      "INVITE": "邀请"
+    },
+    "PLAYER_MANAGER": {
+      "PLAYER_LIST": "玩家列表",
+      "PARTY_MENU": "组队菜单",
+      "BACK": "返回"
+    },
+    "ROOT": {
+      "CONNECT": "连接",
+      "DISCONNECT": "断开连接",
+      "RECONNECT": "重新连接",
+      "PLAYER_MANAGER": "玩家管理",
+      "SETTINGS": "设置",
+      "CONNECTION_IN_PROGRESS": "正在连接"
+    },
+    "SERVER_LIST": {
+      "SEARCH": "搜索...",
+      "REFRESH": "刷新",
+      "BACK": "返回",
+      "LOADING": "加载中...",
+      "NO_SERVERS": "没有有效的服务器",
+      "HIDE_MISMATCHED_SERVER": "隐藏不兼容版本的服务器",
+      "HIDE_FULL_SERVERS": "隐藏满员的服务器",
+      "SERVER_COUNT": "Showing {{filteredCount}} of {{count}} servers",
+      "TABLE_HEADERS": {
+        "NAME": "服务器名称",
+        "PLAYERS": "玩家数量 / 最大数量.",
+        "COUNTRY": "国家",
+        "FAVORITE": "收藏"
+      },
+      "JOIN": "加入"
+    },
+    "SETTINGS": {
+      "AUDIO": "音量",
+      "MUTE_UI": "UI静音",
+      "UI_VOLUME": "UI 音量",
+      "PARTY": "队伍",
+      "SHOW_PARTY": "显示队伍",
+      "AUTO_HIDE_PARTY": "自动隐藏队伍",
+      "AUTO_HIDE_PARTY_LENGTH": "多长时间隐藏",
+      "PARTY_ANCHOR": "队伍列表位置",
+      "PARTY_ANCHOR_POSITION": {
+        "TOP_LEFT": "左上角",
+        "TOP_RIGHT": "右上角",
+        "BOTTOM_RIGHT": "右下角",
+        "BOTTOM_LEFT": "左下角"
+      },
+      "PARTY_ANCHOR_OFFSET_X": "横向偏移",
+      "PARTY_ANCHOR_OFFSET_Y": "纵向偏移",
+      "LENGTH": "{{length}}s",
+      "UI": "用户界面",
+      "LANGUAGE": "语言",
+      "DEBUG": "Debug",
+      "SHOW_DEBUG_INFO": "展示网络等调试信息",
+      "BACK": "返回"
+    }
+  },
+  "SERVICE": {
+    "CLIENT": {
+      "CONNECTION_LOST": "\"连接丢失，正在尝试重新连接. {{remainingReconnectionAttempt } 尝试离开.",
+      "CONNECTED": "成功连接到服务器.",
+      "DISCONNECTED": "与服务器断开连接."
+    },
+    "GROUP": {
+      "LEVEL_UP": "{{name}} 升到了 {{level}} 级.",
+      "ALREADY_IN_GROUP": "你已经在队伍中了，若要加入其他队伍，请离开当前队伍.",
+      "KICK_NO_PARTY_LEADER": "你不能踢其他成员，因为你不是队长.",
+      "MAKE_LEADER_NO_PARTY_LEADER": "你不能让其他成员当队长，因为你不是队长."
+    },
+    "ERROR": {
+      "ERRORS": {
+        "WRONG_VERSION": "这个服务器需要版本 {{expectedVersion}} ,但你的版本是 {{version}}.",
+        "MODS_MISMATCH": "这个服务器开启了Mod检查.{{mods}}",
+        "MODS_MISMATCH_REMOVE": "请删除以下mod后再尝试加入该服务器:\n{{mods}}",
+        "MODS_MISMATCH_INSTALL": "请安装以下mod后再尝试加入该服务器:\n{{mods}}",
+        "CLIENT_MODS_DISALLOWED": "这个服务器不允许这些mod {{mods}}. 请删除后加入.",
+        "WRONG_PASSWORD": "服务器密码错误.",
+        "NO_REASON": "服务器出现了未知的连接问题.",
+        "SERVER_FULL": "此服务器已满."
+      }
+    },
+    "PLAYER_LIST": {
+      "PARTY_INVITE": "{{from}} 邀请你加入队伍"
+    }
+  }
+}
