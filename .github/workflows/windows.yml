@@ -8,6 +8,8 @@ on:
       - bluedove
       - prerel
       - dev
+      - 1.2+
+      - my_test
 jobs:
   build:
     strategy:
