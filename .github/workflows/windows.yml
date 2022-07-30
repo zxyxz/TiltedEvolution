@@ -8,6 +8,7 @@ on:
       - bluedove
       - prerel
       - dev
+      - 1.2+
 jobs:
   build:
     strategy:
