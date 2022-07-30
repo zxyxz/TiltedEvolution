@@ -26,12 +26,10 @@ export class TranslocoHttpLoader implements TranslocoLoader {
         availableLangs: [
           { id: 'en', label: 'English' },
           { id: 'de', label: 'Deutsch' },
-          { id: 'fr', label: 'Français' },
-          { id: 'zh-CN', label: '中文（中国）'},
-          { id: 'nl', label: 'Nederlands' },
+          { id: 'zh-CN', label: '简体中文' },
           { id: 'overwrite', label: 'Custom' },
         ],
-        defaultLang: 'en',
+        defaultLang: 'zh-CN',
         fallbackLang: 'en',
         missingHandler: {
           useFallbackTranslation: true,
