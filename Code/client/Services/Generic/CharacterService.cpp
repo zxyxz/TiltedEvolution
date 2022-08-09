@@ -1433,8 +1433,8 @@ void CharacterService::RequestServerAssignment(const entt::entity aEntity) const
     message.IsWeaponDrawn = pActor->actorState.IsWeaponFullyDrawn();
     message.IsMount = pActor->IsMount();
 
-    if (pNpc->IsTemporary())
-        pNpc = pNpc->GetTemplateBase();
+//    if (pNpc->IsTemporary())
+//        pNpc = pNpc->GetTemplateBase();
 
     if (isTemporary)
     {

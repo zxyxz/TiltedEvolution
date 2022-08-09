@@ -117,11 +117,11 @@ void PartyService::OnPartyInfo(const NotifyPartyInfo& acPartyInfo) noexcept
 
 #if TP_SKYRIM64
         // TODO: this can be done a bit prettier
-        if (m_isLeader)
-        {
-            TESGlobal* pWorldEncountersEnabled = Cast<TESGlobal>(TESForm::GetById(0xB8EC1));
-            pWorldEncountersEnabled->f = 1.f;
-        }
+//        if (m_isLeader)
+//        {
+//            TESGlobal* pWorldEncountersEnabled = Cast<TESGlobal>(TESForm::GetById(0xB8EC1));
+//            pWorldEncountersEnabled->f = 1.f;
+//        }
 #elif TP_FALLOUT4
         // TODO: ft
 #endif
@@ -156,11 +156,11 @@ void PartyService::OnPartyLeft(const NotifyPartyLeft& acPartyLeft) noexcept
 
     // TODO: this can be done a bit prettier
 #if TP_SKYRIM64
-    if (World::Get().GetTransport().IsConnected())
-    {
-        TESGlobal* pWorldEncountersEnabled = Cast<TESGlobal>(TESForm::GetById(0xB8EC1));
-        pWorldEncountersEnabled->f = 0.f;
-    }
+//    if (World::Get().GetTransport().IsConnected())
+//    {
+//        TESGlobal* pWorldEncountersEnabled = Cast<TESGlobal>(TESForm::GetById(0xB8EC1));
+//        pWorldEncountersEnabled->f = 0.f;
+//    }
 #elif TP_FALLOUT4
         // TODO: ft
 #endif
@@ -181,11 +181,11 @@ void PartyService::OnPartyJoined(const NotifyPartyJoined& acPartyJoined) noexcep
 
     // TODO: this can be done a bit prettier
 #if TP_SKYRIM64
-    if (m_isLeader)
-    {
-        TESGlobal* pWorldEncountersEnabled = Cast<TESGlobal>(TESForm::GetById(0xB8EC1));
-        pWorldEncountersEnabled->f = 1.f;
-    }
+//    if (m_isLeader)
+//    {
+//        TESGlobal* pWorldEncountersEnabled = Cast<TESGlobal>(TESForm::GetById(0xB8EC1));
+//        pWorldEncountersEnabled->f = 1.f;
+//    }
 #elif TP_FALLOUT4
         // TODO: ft
 #endif

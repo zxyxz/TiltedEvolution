@@ -62,8 +62,8 @@ void PlayerService::OnConnected(const ConnectedEvent& acEvent) noexcept
     pKillMove->f = 0.f;
 
 #if TP_SKYRIM64
-    TESGlobal* pWorldEncountersEnabled = Cast<TESGlobal>(TESForm::GetById(0xB8EC1));
-    pWorldEncountersEnabled->f = 0.f;
+//    TESGlobal* pWorldEncountersEnabled = Cast<TESGlobal>(TESForm::GetById(0xB8EC1));
+//    pWorldEncountersEnabled->f = 0.f;
 #elif TP_FALLOUT4
     // Makes it so that VATS doesn't slow down time
     float* vatsTargetingMult = Settings::GetVATSSelectTargetTimeMultiplier();
@@ -86,8 +86,8 @@ void PlayerService::OnDisconnected(const DisconnectedEvent& acEvent) noexcept
 #if TP_SKYRIM64
     *greetDistance = 150.f;
 
-    TESGlobal* pWorldEncountersEnabled = Cast<TESGlobal>(TESForm::GetById(0xB8EC1));
-    pWorldEncountersEnabled->f = 1.f;
+//    TESGlobal* pWorldEncountersEnabled = Cast<TESGlobal>(TESForm::GetById(0xB8EC1));
+//    pWorldEncountersEnabled->f = 1.f;
 #elif TP_FALLOUT4
     *greetDistance = 175.f;
 
