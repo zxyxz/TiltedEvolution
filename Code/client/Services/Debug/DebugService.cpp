@@ -52,6 +52,8 @@
 #include <BSGraphics/BSGraphicsRenderer.h>
 #include <Interface/UI.h>
 
+#include <Messages/SendChatMessageRequest.h>
+
 // TODO: ft
 #if TP_SKYRIM64
 #include <Combat/CombatController.h>
@@ -205,17 +207,14 @@ void DebugService::OnUpdate(const UpdateEvent& acUpdateEvent) noexcept
     else
         s_f7Pressed = false;
 
-    if (GetAsyncKeyState(VK_F8) & 0x01)
+    if (GetAsyncKeyState(VK_F8))
     {
         if (!s_f8Pressed)
         {
             s_f8Pressed = true;
 
-        #if 0
-            PlaceActorInWorld();
-            Actor* pEnemy = Cast<Actor>(TESForm::GetById(0x29602));
-            pEnemy->pCombatController->SetTarget(m_actors[0]);
-        #endif
+            // todo
+            //CalendarService::SetTime(8, 0, 0);
         }
     }
     else
