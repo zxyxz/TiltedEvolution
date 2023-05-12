@@ -213,8 +213,11 @@ void DebugService::OnUpdate(const UpdateEvent& acUpdateEvent) noexcept
         {
             s_f8Pressed = true;
 
-            // todo
-            //CalendarService::SetTime(8, 0, 0);
+            SendChatMessageRequest messageRequest;
+            messageRequest.MessageType = static_cast<ChatMessageType>(0);
+            messageRequest.ChatMessage = "settime 8 00";
+
+            m_transport.Send(messageRequest);
         }
     }
     else
