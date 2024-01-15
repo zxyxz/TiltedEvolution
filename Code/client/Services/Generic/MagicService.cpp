@@ -339,6 +339,10 @@ void MagicService::OnAddTargetEvent(const AddTargetEvent& acEvent) noexcept
     }
 
     request.TargetId = serverIdRes.value();
+    request.IsDualCasting = acEvent.IsDualCasting;
+    request.ApplyHealPerkBonus = acEvent.ApplyHealPerkBonus;
+    request.ApplyStaminaPerkBonus = acEvent.ApplyStaminaPerkBonus;
+
     m_transport.Send(request);
 
     spdlog::debug("Sending effect sync request");
@@ -392,6 +396,7 @@ void MagicService::OnNotifyAddTarget(const NotifyAddTarget& acMessage) noexcept
     data.fUnkFloat1 = 1.0f;
 #endif
     data.eCastingSource = MagicSystem::CastingSource::CASTING_SOURCE_COUNT;
+    data.bDualCast = acMessage.IsDualCasting;
 
 #if TP_SKYRIM64
     if (pEffect->IsWerewolfEffect())
@@ -406,7 +411,7 @@ void MagicService::OnNotifyAddTarget(const NotifyAddTarget& acMessage) noexcept
         pActor = PlayerCharacter::Get();
 #endif
 
-    pActor->magicTarget.AddTarget(data);
+    pActor->magicTarget.AddTarget(data, acMessage.ApplyHealPerkBonus, acMessage.ApplyStaminaPerkBonus);
 
     spdlog::debug("Applied remote magic effect");
 }
@@ -510,7 +515,7 @@ void MagicService::UpdateRevealOtherPlayersEffect() noexcept
         if (!pRemotePlayer)
             continue;
 
-        pRemotePlayer->magicTarget.AddTarget(data);
+        pRemotePlayer->magicTarget.AddTarget(data, false, false);
     }
 #endif
 }
