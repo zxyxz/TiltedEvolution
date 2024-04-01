@@ -134,7 +134,7 @@ struct TESObjectREFR : TESForm
     virtual void sub_87();
     virtual void sub_88();
     virtual void DisableImpl();
-    virtual void sub_8A();
+    virtual void ResetInventory(bool abLeveledOnly);
     virtual void sub_8B();
     virtual void sub_8C();
     virtual void sub_8D();
@@ -176,7 +176,7 @@ struct TESObjectREFR : TESForm
     void PayGold(int32_t aAmount) noexcept;
     void PayGoldToContainer(TESObjectREFR* pContainer, int32_t aAmount) noexcept;
 
-    void Activate(TESObjectREFR* apActivator, uint8_t aUnk1, TESBoundObject* apObjectToGet, int32_t aCount, char aDefaultProcessing) noexcept;
+    bool Activate(TESObjectREFR* apActivator, uint8_t aUnk1, TESBoundObject* apObjectToGet, int32_t aCount, char aDefaultProcessing) noexcept;
 
     bool PlayAnimationAndWait(BSFixedString* apAnimation, BSFixedString* apEventName) noexcept;
     bool PlayAnimation(BSFixedString* apEventName) noexcept;
