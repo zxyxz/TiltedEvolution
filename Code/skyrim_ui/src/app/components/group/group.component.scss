@@ -13,15 +13,64 @@
     width: 16vw;
 
     .group-member {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.6vw;
       font-size: 1.5em;
       color: rgb(192, 192, 192);
 
       &.not-loaded {
         opacity: 0.6;
+
+        .member-avatar {
+          filter: grayscale(0.6);
+        }
+      }
+
+      .member-avatar {
+        width: 3.2vw;
+        height: 3.2vw;
+        border-radius: 50%;
+        border: 2px solid rgba(50, 240, 255, 0.85);
+        object-fit: cover;
+        background: rgba(18, 18, 20, 0.9);
+        box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+      }
+
+      .member-details {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3vw;
+        flex: 1 1 auto;
+      }
+
+      .member-header {
+        display: flex;
+        align-items: center;
+        gap: 0.4vw;
+        flex-wrap: nowrap;
+      }
+
+      .member-name-wrap {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 0.35vw;
+        flex: 0 0 auto;
+        white-space: nowrap;
       }
 
       .member-name {
+        flex: 0 0 auto;
         text-shadow: 1px 1px 2px #000000;
+        white-space: nowrap;
+      }
+
+      .member-self {
+        flex: 0 0 auto;
+        font-size: 0.75em;
+        opacity: 0.7;
+        text-shadow: 1px 1px 2px #000000;
+        white-space: nowrap;
       }
 
       .group-member-level {

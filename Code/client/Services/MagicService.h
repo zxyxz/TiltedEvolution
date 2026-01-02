@@ -8,9 +8,16 @@
 #include <Messages/NotifyRemoveSpell.h>
 #include <spdlog/spdlog.h>
 #include <chrono>
+#include <optional>
+#include <string>
+#include <unordered_map>
+#include <queue>
+#include <array>
 
+struct Actor;
 struct World;
 struct TransportService;
+struct SpellItem;
 
 struct UpdateEvent;
 struct SpellCastEvent;
@@ -20,6 +27,8 @@ struct RemoveSpellEvent;
 
 struct NotifySpellCast;
 struct NotifyInterruptCast;
+struct NotifyHealingProximity;
+struct NotifyPartyMemberDowned;
 
 /**
  * @brief Handles magic spell casting and magic effects.
@@ -52,7 +61,7 @@ struct MagicService
     /**
      * @brief Sends local spell cast to the server.
      */
-    void OnSpellCastEvent(const SpellCastEvent& acSpellCastEvent) const noexcept;
+    void OnSpellCastEvent(const SpellCastEvent& acSpellCastEvent) noexcept;
     /**
      * @brief Casts a spell based on a server message.
      */
@@ -60,7 +69,7 @@ struct MagicService
     /**
      * @brief Sends local interruption of spell cast to the server.
      */
-    void OnInterruptCastEvent(const InterruptCastEvent& acEvent) const noexcept;
+    void OnInterruptCastEvent(const InterruptCastEvent& acEvent) noexcept;
     /**
      * @brief Interrupts a spell cast based on a server message.
      */
@@ -81,6 +90,14 @@ struct MagicService
      * @brief Handles removal of a spell
      */
     void OnNotifyRemoveSpell(const NotifyRemoveSpell& acMessage) noexcept;
+    /**
+     * @brief Handles healing proximity for reviving downed players
+     */
+    void OnNotifyHealingProximity(const NotifyHealingProximity& acMessage) noexcept;
+    /**
+     * @brief Receives party downed/revived events and triggers UI/chat and per-player reveal effect.
+     */
+    void OnNotifyPartyMemberDowned(const NotifyPartyMemberDowned& acMessage) noexcept;
 
   private:
     /**
@@ -95,11 +112,52 @@ struct MagicService
      * Apply the "reveal players" effect on remote players.
      */
     void UpdateRevealOtherPlayersEffect(bool aForceTrigger = false) noexcept;
+    /**
+     * @brief Apply the reveal effect to currently downed party members only.
+     */
+    void UpdateRevealDownedPlayersEffect() noexcept;
 
     World& m_world;
     entt::dispatcher& m_dispatcher;
     TransportService& m_transport;
     bool m_revealingOtherPlayers = false;
+    bool m_revealingDownedPlayers = false;
+
+    struct DownedMemberInfo
+    {
+        uint32_t PlayerId = 0;
+        float PositionX = 0.f;
+        float PositionY = 0.f;
+        float PositionZ = 0.f;
+    };
+
+    struct ReviveChannelState
+    {
+        uint32_t CasterServerId = 0;
+        float RequiredSeconds = 0.f;
+        float AccumulatedSeconds = 0.f;
+        std::chrono::steady_clock::time_point LastPingAt{};
+        std::string HealerName;
+    };
+
+    struct HealerChannelState
+    {
+        bool Active = false;
+        float RequiredSeconds = 0.f;
+        float AccumulatedSeconds = 0.f;
+        std::chrono::steady_clock::time_point LastUpdate{};
+        float StartingMagickaValue = 0.f;
+        bool HasStartingMagicka = false;
+        bool CostBuffApplied = false;
+    };
+
+    std::unordered_map<uint32_t, DownedMemberInfo> m_downedPartyMembers;
+    std::optional<ReviveChannelState> m_victimReviveState;
+    HealerChannelState m_healerChannelState;
+    std::array<bool, MagicSystem::CastingSource::CASTING_SOURCE_COUNT> m_localHealingHandsSources{};
+    bool m_isLocalHealingHandsActive = false;
+    uint32_t m_activeHealingHandsSpellId = 0;
+    double m_healingHandsPingAccumulator = 0.0;
 
     entt::scoped_connection m_updateConnection;
     entt::scoped_connection m_spellCastEventConnection;
@@ -110,6 +168,8 @@ struct MagicService
     entt::scoped_connection m_notifyAddTargetConnection;
     entt::scoped_connection m_removeSpellEventConnection;
     entt::scoped_connection m_notifyRemoveSpell;
+    entt::scoped_connection m_notifyHealingProximityConnection;
+    entt::scoped_connection m_notifyPartyMemberDownedConnection;
 
     /*
      * @brief Queued magic effects.
@@ -166,6 +226,25 @@ struct MagicService
   private:
     std::queue<MagicAddTargetEventQueue> m_queuedEffects;
     std::queue<MagicNotifyAddTargetQueue> m_queuedRemoteEffects;
+
+    void UpdateReviveChannels(double aDeltaSeconds) noexcept;
+    void UpdateHealerChannel(double aDeltaSeconds) noexcept;
+    void UpdateHealingHandsBroadcast(double aDeltaSeconds) noexcept;
+    [[nodiscard]] bool IsHealingHandsSpell(uint32_t aSpellFormId, const SpellItem* apSpell = nullptr) const noexcept;
+    [[nodiscard]] float GetRequiredReviveDuration(float aRestorationLevel) const noexcept;
+    void UpdateVictimReviveUi(const ReviveChannelState& aState) const noexcept;
+    void StopVictimReviveUi() noexcept;
+    void UpdateHealerUi() const noexcept;
+    void StopHealerUi() noexcept;
+    void ApplyHealerCostModifiers(Actor* apCaster) noexcept;
+    void ClearHealerCostModifiers(Actor* apCaster) noexcept;
+    [[nodiscard]] bool HasDownedPartyMemberInRange(float aRange) noexcept;
+    [[nodiscard]] Actor* FindActorByServerId(uint32_t aServerId) const noexcept;
+    [[nodiscard]] std::string ResolvePlayerName(uint32_t aServerId) const;
+    [[nodiscard]] std::optional<uint32_t> GetLocalServerId() const noexcept;
+    bool SendHealingProximityPing(uint32_t aSpellFormId) noexcept;
+    void ResetLocalHealingHandsState() noexcept;
+    void HandleHealingHandsInterrupt(MagicSystem::CastingSource aSource) noexcept;
 };
 
 // Exposed so we can increase log level of just this tricky code, in debugger or a build.

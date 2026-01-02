@@ -41,7 +41,7 @@ void DebugService::DrawPartyView()
             auto playerEntry = players.find(playerId);
             if (playerEntry != players.end())
             {
-                auto playerName = playerEntry.value();
+                auto playerName = playerEntry.value().Name;
                 if (playerId == partyService.GetLeaderPlayerId())
                 {
                     playerName += " (Leader)";
@@ -52,7 +52,7 @@ void DebugService::DrawPartyView()
                 if (ImGui::Button("Teleport"))
                 {
                     TeleportCommandRequest request{};
-                    request.TargetPlayer = playerEntry.value();
+                    request.TargetPlayer = playerEntry.value().Name;
 
                     m_transport.Send(request);
                 }
@@ -91,7 +91,7 @@ void DebugService::DrawPartyView()
                     continue;
 
                 playerCount++;
-                ImGui::BulletText(player.second.c_str());
+                ImGui::BulletText(player.second.Name.c_str());
                 ImGui::SameLine(100);
                 if (ImGui::Button("Invite"))
                 {
@@ -116,7 +116,7 @@ void DebugService::DrawPartyView()
             if (std::find(std::begin(members), std::end(members), player.first) != std::end(members))
                 continue;
 
-            ImGui::Text(player.second.c_str());
+            ImGui::Text(player.second.Name.c_str());
             ImGui::SameLine(100);
             if (ImGui::Button("Accept"))
             {

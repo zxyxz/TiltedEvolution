@@ -13,6 +13,8 @@ struct NotifyPartyInfo;
 struct PartyCreateRequest;
 struct PartyChangeLeaderRequest;
 struct PartyKickRequest;
+struct PartyPositionUpdateRequest;
+struct PartyPositionsRequest;
 
 /**
  * @brief Manages every party in the server.
@@ -46,6 +48,8 @@ protected:
     void OnPartyCreate(const PacketEvent<PartyCreateRequest>& acPacket) noexcept;
     void OnPartyChangeLeader(const PacketEvent<PartyChangeLeaderRequest>& acPacket) noexcept;
     void OnPartyKick(const PacketEvent<PartyKickRequest>& acPacket) noexcept;
+    void OnPartyPositionUpdate(const PacketEvent<PartyPositionUpdateRequest>& acPacket) noexcept;
+    void OnPartyPositionsRequest(const PacketEvent<PartyPositionsRequest>& acPacket) noexcept;
     void RemovePlayerFromParty(Player* apPlayer) noexcept;
 
     void BroadcastPlayerList(Player* apPlayer = nullptr) const noexcept;
@@ -57,6 +61,7 @@ private:
     TiltedPhoques::Map<uint32_t, Party> m_parties;
     uint32_t m_nextId{0};
     uint64_t m_nextInvitationExpire{0};
+    uint64_t m_nextPositionsBroadcast{0};
 
     entt::scoped_connection m_updateEvent;
     entt::scoped_connection m_playerJoinConnection;
@@ -67,6 +72,8 @@ private:
     entt::scoped_connection m_partyCreateConnection;
     entt::scoped_connection m_partyChangeLeaderConnection;
     entt::scoped_connection m_partyKickConnection;
+    entt::scoped_connection m_partyPositionUpdateConnection;
+    entt::scoped_connection m_partyPositionsRequestConnection;
 
     void SendPartyJoinedEvent(Party& aParty, Player* aPlayer) noexcept;
 };

@@ -27,9 +27,20 @@ private:
     void ProcessRevealPlayersMessage();
     void ProcessChatMessage(CefRefPtr<CefListValue> aEventArgs);
     void ProcessSetTimeCommand(CefRefPtr<CefListValue> aEventArgs);
-    void ProcessTeleportMessage(CefRefPtr<CefListValue> aEventArgs);
+    void ProcessTeleportRequestMessage(CefRefPtr<CefListValue> aEventArgs);
+    void ProcessTeleportResponseMessage(CefRefPtr<CefListValue> aEventArgs);
+    void ProcessSetProfilePicture(CefRefPtr<CefListValue> aEventArgs);
+    void ProcessSetNameTagMode(CefRefPtr<CefListValue> aEventArgs);
     void ProcessToggleDebugUI();
+    void ProcessPlayEmote(CefRefPtr<CefListValue> aEventArgs);
     void SetUIVisible(bool aVisible) noexcept;
 
     TransportService& m_transport;
 };
+
+extern std::atomic<bool> g_emoteWheelActive;
+extern std::string g_emoteEventName;
+extern std::chrono::steady_clock::time_point g_emoteLastPlayed;
+extern NiPoint3 g_emoteStartPos;
+extern NiPoint3 g_emoteStartRot;
+extern std::atomic<bool> g_emoteStartValid;

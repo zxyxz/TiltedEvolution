@@ -47,6 +47,12 @@
         color: #eeff00;
       }
     }
+    &.whisper {
+      .app-chat-message {
+        color: #c0c0c0;
+        font-style: italic;
+      }
+    }
   }
 }
 

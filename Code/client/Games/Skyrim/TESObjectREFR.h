@@ -17,6 +17,9 @@ struct AnimationVariables;
 struct TESWorldSpace;
 struct TESBoundObject;
 struct TESContainer;
+struct TESEffectShader;
+struct ShaderReferenceEffect;
+struct NiAVObject;
 
 enum class ITEM_REMOVE_REASON
 {
@@ -161,7 +164,10 @@ struct TESObjectREFR : TESForm
     virtual void sub_9A();
     virtual void sub_9B();
 
+    void SetPosition(const NiPoint3& acPosition) noexcept;
+    void SetAngle(const NiPoint3& acAngle) noexcept;
     void SetRotation(float aX, float aY, float aZ) noexcept;
+    void SetRotation(const NiPoint3& acRotation) noexcept;
 
     BSPointerHandle<TESObjectREFR> GetHandle() const noexcept;
     uint32_t GetCellId() const noexcept;
@@ -186,6 +192,7 @@ struct TESObjectREFR : TESForm
     void PayGold(int32_t aAmount) noexcept;
     void PayGoldToContainer(TESObjectREFR* pContainer, int32_t aAmount) noexcept;
     bool SendAnimationEvent(BSFixedString* apEventName) noexcept;
+    ShaderReferenceEffect* ApplyEffectShader(TESEffectShader* apEffectShader, float aDuration = -1.0f, TESObjectREFR* apFacingRef = nullptr, bool aFaceTarget = false, bool aAttachToCamera = false, NiAVObject* apAttachNode = nullptr, bool aInterfaceEffect = false);
 
     bool Activate(TESObjectREFR* apActivator, uint8_t aUnk1, TESBoundObject* apObjectToGet, int32_t aCount, char aDefaultProcessing) noexcept;
 

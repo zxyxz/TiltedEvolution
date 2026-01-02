@@ -11,6 +11,7 @@ import { ActionButtonsComponent } from './components/action-buttons/action-butto
 import { ChatComponent } from './components/chat/chat.component';
 import { ConnectComponent } from './components/connect/connect.component';
 import { ConnectPasswordComponent } from './components/connect-password/connect-password.component';
+import { DeathScreenComponent } from './components/death-screen/death-screen.component';
 import { DebugComponent } from './components/debug/debug.component';
 import { DisconnectComponent } from './components/disconnect/disconnect.component';
 import { DropdownOptionComponent } from './components/dropdown/dropdown-option.component';
@@ -25,12 +26,18 @@ import { OrderComponent } from './components/order/order.component';
 import { PartyMenuComponent } from './components/party-menu/party-menu.component';
 import { PlayerListComponent } from './components/player-list/player-list.component';
 import { PlayerManagerComponent } from './components/player-manager/player-manager.component';
+import { TradePopupComponent } from './components/trade-popup/trade-popup.component';
+import { EmoteMenuComponent } from './components/emote-menu/emote-menu.component';
 import { PopupComponent } from './components/popup/popup.component';
 import { RootComponent } from './components/root/root.component';
 import { ServerListComponent } from './components/server-list/server-list.component';
 import { SettingsComponent } from './components/settings/settings.component';
+import { SyncStatusBadgeComponent } from './components/sync-status-badge/sync-status-badge.component';
 import { ToggleComponent } from './components/toggle/toggle.component';
 import { WindowComponent } from './components/window/window.component';
+import { PartyPinsComponent } from './components/party-pins/party-pins.component';
+import { OverlayBannerComponent } from './components/overlay-banner/overlay-banner.component';
+import { ReviveProgressComponent } from './components/revive-progress/revive-progress.component';
 import { HealthDirective } from './directives/health.directive';
 import { RadioDirective } from './directives/radio.directive';
 import { SliderDirective } from './directives/slider.directive';
@@ -51,6 +58,7 @@ import { TranslocoRootModule } from './transloco-root.module';
     ChatComponent,
     ConnectComponent,
     ConnectPasswordComponent,
+    DeathScreenComponent,
     DebugComponent,
     DisconnectComponent,
     DropdownComponent,
@@ -65,13 +73,19 @@ import { TranslocoRootModule } from './transloco-root.module';
     PartyMenuComponent,
     PlayerListComponent,
     PlayerManagerComponent,
+    TradePopupComponent,
+    EmoteMenuComponent,
     ActionButtonsComponent,
     PopupComponent,
     RootComponent,
+    SyncStatusBadgeComponent,
     ServerListComponent,
     SettingsComponent,
     ToggleComponent,
     WindowComponent,
+    PartyPinsComponent,
+    OverlayBannerComponent,
+    ReviveProgressComponent,
 
     CheckboxDirective,
     HealthDirective,

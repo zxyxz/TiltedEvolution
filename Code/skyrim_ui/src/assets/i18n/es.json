@@ -133,6 +133,13 @@
         "L": "Grande",
         "XL": "Extra grande"
       },
+      "NAMETAG_MODE": "Nametag Style",
+      "NAMETAG_MODES": {
+        "NORMAL": "Classic (avatar + level stacked)",
+        "DETAILED": "Compact (avatar + level)",
+        "BASIC": "Name only",
+        "HIDDEN": "Hidden"
+      },
       "BACK": "Atrás"
     }
   },

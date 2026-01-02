@@ -1,0 +1,74 @@
+<div class="death-screen" *ngIf="isVisible$ | async">
+  <div class="death-overlay"></div>
+  <div class="death-content">
+    <div class="death-card">
+      <div class="card-header">
+        <div class="skull-icon"></div>
+        <div class="title-group">
+          <p class="subtitle">Spirit Released</p>
+          <h1>YOU HAVE FALLEN</h1>
+        </div>
+      </div>
+
+      <div class="status-grid">
+        <div class="status-tile">
+          <span class="label">Respawn Cooldown</span>
+          <span class="value">{{ secondsRemaining$ | async }}s</span>
+          <small>Respawn at the entrance once this reaches zero.</small>
+        </div>
+        <div
+          class="status-tile"
+          [class.ready]="isRespawnButtonEnabled$ | async"
+        >
+          <span class="label">Entrance Respawn</span>
+          <span class="value">
+            {{ (isRespawnButtonEnabled$ | async) ? 'Ready' : 'Charging' }}
+          </span>
+          <small>Hold tight or return to the entrance immediately.</small>
+        </div>
+      </div>
+
+      <ng-container
+        *ngIf="reviveState$ | async as reviveState; else reviveFallback"
+      >
+        <div class="revive-panel">
+          <div class="panel-header">
+            <span class="title">
+              {{ reviveState.healerName || 'An ally' }} is reviving you
+            </span>
+            <span class="eta">
+              {{ reviveState.remainingSeconds | number : '1.0-1' }}s remaining
+            </span>
+          </div>
+          <div class="progress-track">
+            <div
+              class="progress-fill"
+              [style.width.%]="reviveState.progress * 100"
+            ></div>
+          </div>
+          <div class="panel-footnote">
+            Only <strong>Healing Hands</strong> revives in place. Channel time
+            shortens with the healer's Restoration skill.
+          </div>
+        </div>
+      </ng-container>
+
+      <ng-template #reviveFallback>
+        <p class="support-text">
+          Wait for a party member to channel <strong>Healing Hands</strong> for
+          at least 15 seconds (faster with higher Restoration), or respawn at
+          the entrance once the cooldown ends.
+        </p>
+      </ng-template>
+
+      <button
+        class="respawn-button"
+        [class.ready]="isRespawnButtonEnabled$ | async"
+        [disabled]="!(isRespawnButtonEnabled$ | async)"
+        (click)="onRespawnClicked()"
+      >
+        Respawn at Entrance
+      </button>
+    </div>
+  </div>
+</div>

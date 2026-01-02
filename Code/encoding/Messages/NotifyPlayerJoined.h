@@ -18,10 +18,11 @@ struct NotifyPlayerJoined final : ServerMessage
     void SerializeRaw(TiltedPhoques::Buffer::Writer& aWriter) const noexcept override;
     void DeserializeRaw(TiltedPhoques::Buffer::Reader& aReader) noexcept override;
 
-    bool operator==(const NotifyPlayerJoined& acRhs) const noexcept { return GetOpcode() == acRhs.GetOpcode() && PlayerId == acRhs.PlayerId && Username == acRhs.Username && WorldSpaceId == acRhs.WorldSpaceId && CellId == acRhs.CellId && Level == acRhs.Level; }
+    bool operator==(const NotifyPlayerJoined& acRhs) const noexcept { return GetOpcode() == acRhs.GetOpcode() && PlayerId == acRhs.PlayerId && Username == acRhs.Username && Avatar == acRhs.Avatar && WorldSpaceId == acRhs.WorldSpaceId && CellId == acRhs.CellId && Level == acRhs.Level; }
 
     uint32_t PlayerId{};
     String Username{};
+    String Avatar{};
     GameId WorldSpaceId{};
     GameId CellId{};
     uint16_t Level{};

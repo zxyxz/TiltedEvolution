@@ -1,0 +1,18 @@
+<div class="revive-overlay" *ngIf="state$ | async as state">
+  <div class="revive-box">
+    <p class="title">Channeling Healing Hands</p>
+    <div class="progress-track">
+      <div
+        class="progress-fill"
+        [style.width.%]="state.progress * 100"
+      ></div>
+    </div>
+    <div class="meta">
+      <span>{{ state.remainingSeconds | number: '1.0-1' }}s remaining</span>
+      <span>{{ (state.progress * 100) | number: '1.0-0' }}%</span>
+    </div>
+    <p class="footnote">
+      Stay locked on your ally to keep the channel alive.
+    </p>
+  </div>
+</div>

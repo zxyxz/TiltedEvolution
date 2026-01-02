@@ -1,9 +1,10 @@
 #pragma once
 
-#include <AdminMessages/Message.h>
 #include <Messages/AuthenticationRequest.h>
 #include <Messages/Message.h>
 #include <World.h>
+#include <common/ServerStatusSnapshot.h>
+#include <console/ConsoleRegistry.h>
 
 using TiltedPhoques::ConnectionId_t;
 using TiltedPhoques::Server;
@@ -55,7 +56,6 @@ struct GameServer final : Server
 
     // Packet dispatching
     void Send(ConnectionId_t aConnectionId, const ServerMessage& acServerMessage) const;
-    void Send(ConnectionId_t aConnectionId, const ServerAdminMessage& acServerMessage) const;
     void SendToLoaded(const ServerMessage& acServerMessage) const;
     void SendToPlayers(const ServerMessage& acServerMessage, const Player* apExcludeSender = nullptr) const;
     bool SendToPlayersInRange(const ServerMessage& acServerMessage, const entt::entity acOrigin, const Player* apExcludeSender = nullptr) const;
@@ -67,12 +67,6 @@ struct GameServer final : Server
     bool IsRunning() const noexcept { return !m_requestStop; }
     bool IsPasswordProtected() const noexcept { return m_isPasswordProtected; }
 
-    template <class T> void ForEachAdmin(const T& aFunctor)
-    {
-        for (auto id : m_adminSessions)
-            aFunctor(id);
-    }
-
     struct Uptime
     {
         int weeks;
@@ -81,17 +75,10 @@ struct GameServer final : Server
         int minutes;
     };
     Uptime GetUptime() const noexcept;
+    Console::ConsoleRegistry::ExecutionResult ExecuteConsoleCommand(const String& aCommand) noexcept;
+    void GetStatusSnapshot(ServerStatusSnapshot& aOutStatus) const;
 
     World& GetWorld() const noexcept { return *m_pWorld; }
-
-    [[nodiscard]] const TiltedPhoques::Set<ConnectionId_t>& GetAdminSessions() const noexcept { return m_adminSessions; }
-
-    void AddAdminSession(ConnectionId_t acSession) noexcept { m_adminSessions.insert(acSession); }
-
-    void RemoveAdminSession(ConnectionId_t acSession) noexcept { m_adminSessions.erase(acSession); }
-
-    Player* GetAdminByUsername(const String& acUsername) const noexcept;
-    Player const* GetAdminByUsername(const String& acUsername) noexcept;
 
 protected:
     bool ValidateAuthParams(ConnectionId_t aConnectionId, const UniquePtr<AuthenticationRequest>& acRequest);
@@ -111,15 +98,12 @@ private:
     std::chrono::high_resolution_clock::time_point m_startTime;
     std::chrono::high_resolution_clock::time_point m_lastFrameTime;
     std::function<void(UniquePtr<ClientMessage>&, ConnectionId_t)> m_messageHandlers[kClientOpcodeMax];
-    std::function<void(UniquePtr<ClientAdminMessage>&, ConnectionId_t)> m_adminMessageHandlers[kClientAdminOpcodeMax];
-
     bool m_isPasswordProtected{};
 
     Info m_info{};
     UniquePtr<Resources::ResourceCollection> m_pResources;
     Console::ConsoleRegistry& m_commands;
 
-    TiltedPhoques::Set<ConnectionId_t> m_adminSessions;
     TiltedPhoques::Map<ConnectionId_t, entt::entity> m_connectionToEntity;
 
     UniquePtr<World> m_pWorld;

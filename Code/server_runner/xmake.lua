@@ -26,13 +26,16 @@ local function build_runner()
     add_deps(
         "CommonLib",
         "Console",
-        "BaseLib")
+        "BaseLib",
+        "ImGuiImpl")
     add_packages(
         "tiltedcore",
         "spdlog",
         "hopscotch-map",
         "sentry-native",
-        "libuv")
+        "libuv",
+        "imgui")
+    add_syslinks("d3d11", "dxgi")
     add_defines("SPDLOG_HEADER_ONLY")
 end
 

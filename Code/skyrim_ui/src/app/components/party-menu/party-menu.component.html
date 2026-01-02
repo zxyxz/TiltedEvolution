@@ -1,3 +1,43 @@
+<div class="profile-picture-panel">
+  <h3 class="panel-title">
+    {{ 'COMPONENT.PARTY_MENU.PROFILE_PICTURE.TITLE' | transloco }}
+  </h3>
+  <p class="panel-description">
+    {{ 'COMPONENT.PARTY_MENU.PROFILE_PICTURE.DESCRIPTION' | transloco }}
+  </p>
+  <div class="profile-picture-preview" (click)="resetUploadError()">
+    <img
+      [src]="profilePreviewSafeUrl$ | async"
+      [alt]="'Profile picture preview'"
+      draggable="false"
+    />
+  </div>
+  <div class="profile-picture-actions">
+    <label class="upload-button" (click)="resetUploadError()">
+      <input
+        type="file"
+        accept="image/png,image/jpeg"
+        (change)="onProfilePictureSelected($event)"
+      />
+      {{ 'COMPONENT.PARTY_MENU.PROFILE_PICTURE.UPLOAD' | transloco }}
+    </label>
+    <button
+      type="button"
+      class="remove-button"
+      (click)="clearProfilePicture()"
+      [disabled]="!(profilePreview$ | async)"
+    >
+      {{ 'COMPONENT.PARTY_MENU.PROFILE_PICTURE.REMOVE' | transloco }}
+    </button>
+  </div>
+  <p class="hint">
+    {{ 'COMPONENT.PARTY_MENU.PROFILE_PICTURE.SIZE_LIMIT' | transloco }}
+  </p>
+  <p class="error" *ngIf="uploadError$ | async as errorKey">
+    {{ errorKey | transloco }}
+  </p>
+</div>
+
 <div *ngIf="!(group$ | async)?.isEnabled; else inParty">
   <p
     class="optional-info"
@@ -46,7 +86,7 @@
       (click)="acceptPartyInvite(player.id)"
     >
       {{
-        'COMPONENT.PARTY_MENU.ACCEPT_INVITE' | transloco: { name: player.name }
+        'COMPONENT.PARTY_MENU.ACCEPT_INVITE' | transloco : { name: player.name }
       }}
     </button>
   </div>
@@ -84,9 +124,24 @@
             <td>
               <button
                 class="user-action-button"
-                (click)="teleportToPlayer(player.id)"
+                (click)="requestTeleport(player.id)"
+                *ngIf="!player.hasTeleportRequest"
               >
-                {{ 'COMPONENT.PARTY_MENU.ACTIONS.TELEPORT' | transloco }}
+                {{ 'COMPONENT.PARTY_MENU.ACTIONS.ASK_TELEPORT' | transloco }}
+              </button>
+              <button
+                class="user-action-button"
+                *ngIf="player.hasTeleportRequest"
+                (click)="respondTeleport(player.id, true)"
+              >
+                {{ 'COMPONENT.PARTY_MENU.ACTIONS.ACCEPT_TELEPORT' | transloco }}
+              </button>
+              <button
+                class="user-action-button"
+                *ngIf="player.hasTeleportRequest"
+                (click)="respondTeleport(player.id, false)"
+              >
+                {{ 'COMPONENT.PARTY_MENU.ACTIONS.DENY_TELEPORT' | transloco }}
               </button>
               <button
                 (click)="kickMember(player.id)"

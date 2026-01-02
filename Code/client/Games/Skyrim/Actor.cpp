@@ -1,3 +1,5 @@
+#include <TiltedOnlinePCH.h>
+
 #include <Games/References.h>
 #include <Games/Skyrim/EquipManager.h>
 #include <AI/AIProcess.h>
@@ -14,6 +16,8 @@
 
 #include <Events/HealthChangeEvent.h>
 #include <Events/InventoryChangeEvent.h>
+#include <Events/DropItemEvent.h>
+#include <Events/PickupDroppedItemEvent.h>
 #include <Events/MountEvent.h>
 #include <Events/DialogueEvent.h>
 #include <Events/HitEvent.h>
@@ -21,6 +25,7 @@
 
 #include <Games/TES.h>
 #include <World.h>
+#include <Services/SyncModeService.h>
 #include <Services/PapyrusService.h>
 
 #include <Forms/ActorValueInfo.h>
@@ -31,6 +36,14 @@
 #include <Games/Skyrim/Misc/InventoryEntry.h>
 #include <Games/Skyrim/ExtraData/ExtraCount.h>
 #include <Games/Misc/ActorKnowledge.h>
+#include <Games/Skyrim/TESObjectREFR.h>
+
+#include <Sync/DropManager.h>
+#include <Sync/DropExecutionContext.h>
+
+#include <optional>
+#include <chrono>
+#include <utility>
 
 #include <ExtraData/ExtraDataList.h>
 #include <ExtraData/ExtraCharge.h>
@@ -43,6 +56,7 @@
 #include <Forms/EnchantmentItem.h>
 #include <Forms/AlchemyItem.h>
 #include <Forms/TESObjectCELL.h>
+#include <Forms/TESWorldSpace.h>
 
 #include <Structs/Skyrim/AnimationGraphDescriptor_BHR_Master.h>
 
@@ -54,6 +68,159 @@
 #include <Forms/TESObjectARMO.h>
 
 #include <ModCompat/BehaviorVar.h>
+#include <Components.h>
+
+namespace
+{
+bool IsRemoteGhostActor(Actor* apActor)
+{
+    if (!apActor || !entt::locator<World>::has_value())
+        return false;
+
+    auto* pExt = apActor->GetExtension();
+    if (!pExt || !pExt->IsRemotePlayer())
+        return false;
+
+    auto& world = World::Get();
+
+    if (world.GetSyncModeService().GetLocalMode() == SyncMode::Ghost)
+        return true;
+
+    auto view = world.view<FormIdComponent, GhostComponent>();
+    const auto it = std::find_if(view.begin(), view.end(),
+        [view, formId = apActor->formID](entt::entity e)
+        { return view.get<FormIdComponent>(e).Id == formId && view.get<GhostComponent>(e).IsGhost; });
+
+    return it != view.end();
+}
+} // namespace
+
+namespace
+{
+constexpr float kDropSearchRadiusSquared = 200.0f * 200.0f;
+
+TESObjectREFR* FindDroppedReferenceNear(const TESBoundObject* apObject, const NiPoint3& acCenter)
+{
+    if (!apObject)
+        return nullptr;
+
+    TES* pTes = TES::Get();
+    if (!pTes || !pTes->cells || !pTes->cells->arr)
+        return nullptr;
+
+    const int dimension = pTes->cells->dimension;
+    if (dimension <= 0)
+        return nullptr;
+
+    auto evaluateCell = [&](TESObjectCELL* apCell, TESObjectREFR*& apBestMatch, float& aBestDistanceSq) {
+        if (!apCell || !apCell->IsValid())
+            return;
+
+        auto* pReferences = apCell->refData.refArray;
+        if (!pReferences)
+            return;
+
+        const uint32_t referenceCount = apCell->refData.Count();
+        for (uint32_t j = 0; j < referenceCount; ++j)
+        {
+            TESObjectREFR* pCandidate = pReferences[j].Get();
+            if (!pCandidate || pCandidate->baseForm != apObject || pCandidate->formType == Actor::Type)
+                continue;
+
+            const float diffX = pCandidate->position.x - acCenter.x;
+            const float diffY = pCandidate->position.y - acCenter.y;
+            const float diffZ = pCandidate->position.z - acCenter.z;
+            const float distanceSq = diffX * diffX + diffY * diffY + diffZ * diffZ;
+
+            if (distanceSq < aBestDistanceSq)
+            {
+                aBestDistanceSq = distanceSq;
+                apBestMatch = pCandidate;
+            }
+        }
+    };
+
+    TESObjectREFR* pClosest = nullptr;
+    float closestDistanceSq = kDropSearchRadiusSquared;
+
+    const int cellCount = dimension * dimension;
+    for (int i = 0; i < cellCount; ++i)
+    {
+        TESObjectCELL* pCell = pTes->cells->arr[i];
+        evaluateCell(pCell, pClosest, closestDistanceSq);
+    }
+
+    if (!pClosest)
+        evaluateCell(pTes->interiorCell, pClosest, closestDistanceSq);
+
+    return pClosest;
+}
+
+GameId ResolveReferenceId(TESObjectREFR* apReference) noexcept
+{
+    GameId reference{};
+    if (!apReference)
+        return reference;
+
+    World::Get().GetModSystem().GetServerModId(apReference->formID, reference);
+    return reference;
+}
+
+std::pair<GameId, GameId> ResolveReferenceCellMetadata(TESObjectREFR* apReference) noexcept
+{
+    GameId cell{};
+    GameId world{};
+
+    if (!apReference)
+        return {cell, world};
+
+    TESObjectCELL* pCell = apReference->parentCell ? apReference->parentCell : apReference->GetParentCell();
+    if (pCell)
+    {
+        auto& modSystem = World::Get().GetModSystem();
+        modSystem.GetServerModId(pCell->formID, cell);
+        if (pCell->worldspace)
+            modSystem.GetServerModId(pCell->worldspace->formID, world);
+    }
+
+    return {cell, world};
+}
+
+void PopulatePickupEventFromDrop(uint64_t aDropId, PickupDroppedItemEvent& aEvent) noexcept
+{
+    if (const auto dropOpt = DropManager::GetServerDrop(aDropId); dropOpt)
+    {
+        aEvent.HasItemData = true;
+        aEvent.Item = dropOpt->Item;
+        aEvent.HasLocation = true;
+        aEvent.Location = dropOpt->Location;
+        aEvent.HasRotation = true;
+        aEvent.Rotation = dropOpt->Rotation;
+        aEvent.CellId = dropOpt->CellId;
+        aEvent.WorldSpaceId = dropOpt->WorldSpaceId;
+        aEvent.ReferenceId = dropOpt->ReferenceId;
+    }
+}
+
+void PopulatePickupEventFromReference(TESObjectREFR* apReference, const Inventory::Entry& acItem, PickupDroppedItemEvent& aEvent) noexcept
+{
+    if (!apReference)
+        return;
+
+    aEvent.ReferenceFormId = apReference->formID;
+    aEvent.HasItemData = true;
+    aEvent.Item = acItem;
+    aEvent.HasLocation = true;
+    aEvent.Location = apReference->position;
+    aEvent.HasRotation = true;
+    aEvent.Rotation = apReference->rotation;
+
+    const auto cellMeta = ResolveReferenceCellMetadata(apReference);
+    aEvent.CellId = cellMeta.first;
+    aEvent.WorldSpaceId = cellMeta.second;
+    aEvent.ReferenceId = ResolveReferenceId(apReference);
+}
+} // namespace
 
 #ifdef SAVE_STUFF
 
@@ -330,6 +497,9 @@ Actor* Actor::GetCombatTarget() const noexcept
 // The internal targeting system should be disabled instead.
 void Actor::StartCombatEx(Actor* apTarget) noexcept
 {
+    if (IsRemoteGhostActor(apTarget))
+        return;
+
     if (GetCombatTarget() != apTarget)
     {
         StopCombat();
@@ -339,12 +509,22 @@ void Actor::StartCombatEx(Actor* apTarget) noexcept
 
 void Actor::SetCombatTargetEx(Actor* apTarget) noexcept
 {
+    if (IsRemoteGhostActor(apTarget))
+    {
+        if (pCombatController)
+            pCombatController->SetTarget(nullptr);
+        return;
+    }
+
     if (pCombatController)
         pCombatController->SetTarget(apTarget);
 }
 
 void Actor::StartCombat(Actor* apTarget) noexcept
 {
+    if (IsRemoteGhostActor(apTarget))
+        return;
+
     PAPYRUS_FUNCTION(void, Actor, StartCombat, Actor*);
     s_pStartCombat(this, apTarget);
 }
@@ -562,6 +742,7 @@ Factions Actor::GetFactions() const noexcept
 
     auto& modSystem = World::Get().GetModSystem();
 
+
     auto* pNpc = Cast<TESNPC>(baseForm);
     if (pNpc)
     {
@@ -690,12 +871,20 @@ void Actor::SetActorInventory(const Inventory& acInventory) noexcept
 
     Inventory currentInventory = GetActorInventory();
 
-    if (!this->GetExtension()->IsPlayer() && currentInventory.ContainsQuestItems())
-        SetInventoryRetainingQuestItems(currentInventory, acInventory);
-    else
-        SetInventory(acInventory);
+    const bool hasQuestItems = currentInventory.ContainsQuestItems();
+    const bool isPlayer = this->GetExtension()->IsPlayer();
 
-    SetMagicEquipment(acInventory.CurrentMagicEquipment);
+    if (!isPlayer && hasQuestItems)
+    {
+        SetInventoryRetainingQuestItems(currentInventory, acInventory);
+        SetMagicEquipment(acInventory.CurrentMagicEquipment);
+    }
+    else
+    {
+        SetInventory(acInventory);
+        if (isPlayer || !hasQuestItems)
+            SetMagicEquipment(acInventory.CurrentMagicEquipment);
+    }
 }
 
 void Actor::SetMagicEquipment(const MagicEquipment& acEquipment) noexcept
@@ -775,6 +964,16 @@ void Actor::SetPlayerTeammate(bool aSet) noexcept
     TP_THIS_FUNCTION(TSetPlayerTeammate, void, Actor, bool aSet, bool abCanDoFavor);
     POINTER_SKYRIMSE(TSetPlayerTeammate, setPlayerTeammate, 37717);
     return TiltedPhoques::ThisCall(setPlayerTeammate, this, aSet, true);
+}
+
+bool Actor::HasLineOfSight(TESObjectREFR* apTarget) noexcept
+{
+    if (!apTarget)
+        return false;
+
+    TP_THIS_FUNCTION(THasLineOfSight, bool, Actor, TESObjectREFR*);
+    POINTER_SKYRIMSE(THasLineOfSight, hasLineOfSight, 37716);
+    return TiltedPhoques::ThisCall(hasLineOfSight, this, apTarget);
 }
 
 void Actor::UnEquipAll() noexcept
@@ -910,8 +1109,11 @@ char TP_MAKE_THISCALL(HookSetPosition, Actor, NiPoint3& aPosition)
 {
     const auto pExtension = apThis ? apThis->GetExtension() : nullptr;
     const auto bIsRemote = pExtension && pExtension->IsRemote();
+    bool bAllowRemoteUpdate = ScopedReferencesOverride::IsOverriden();
+    if (!bAllowRemoteUpdate && bIsRemote && apThis)
+        bAllowRemoteUpdate = apThis->IsDead();
 
-    if (bIsRemote && !ScopedReferencesOverride::IsOverriden())
+    if (bIsRemote && !bAllowRemoteUpdate)
         return 1;
 
     // Don't interfere with non actor references, or the player, or if we are calling our self
@@ -956,7 +1158,17 @@ bool TP_MAKE_THISCALL(HookSpawnActorInWorld, Actor)
         spdlog::info("Spawn Actor: {:X}, and NPC {}", apThis->formID, pNpc->fullName.value);
     }
 
-    return TiltedPhoques::ThisCall(RealSpawnActorInWorld, apThis);
+    const bool result = TiltedPhoques::ThisCall(RealSpawnActorInWorld, apThis);
+
+    // Re-apply ghost visuals after 3D rebuilds/cell transitions without doing it from the per-frame update loop.
+    if (entt::locator<World>::has_value())
+    {
+        const auto* pExtension = apThis ? apThis->GetExtension() : nullptr;
+        if (pExtension && pExtension->IsRemotePlayer())
+            World::Get().GetSyncModeService().OnActor3DUpdated(apThis);
+    }
+
+    return result;
 }
 
 TP_THIS_FUNCTION(TDamageActor, bool, Actor, float aDamage, Actor* apHitter, bool aKillMove);
@@ -965,8 +1177,41 @@ static TDamageActor* RealDamageActor = nullptr;
 // TODO: this is flawed, since it does not account for invulnerable actors
 bool TP_MAKE_THISCALL(HookDamageActor, Actor, float aDamage, Actor* apHitter, bool aKillMove)
 {
-    if (apHitter)
+    // Remote ghosts should never generate hits that can aggro NPCs locally.
+    if (apHitter && entt::locator<World>::has_value())
+    {
+        auto* pHitterExt = apHitter->GetExtension();
+        if (pHitterExt && pHitterExt->IsRemotePlayer())
+        {
+            auto& world = World::Get();
+            bool hitterGhosted = (world.GetSyncModeService().GetLocalMode() == SyncMode::Ghost);
+
+            if (!hitterGhosted)
+            {
+                auto view = world.view<FormIdComponent, GhostComponent>();
+                const auto it = std::find_if(view.begin(), view.end(),
+                    [view, hitterId = apHitter->formID](entt::entity e) { return view.get<FormIdComponent>(e).Id == hitterId && view.get<GhostComponent>(e).IsGhost; });
+                hitterGhosted = (it != view.end());
+            }
+
+            if (hitterGhosted)
+                return false;
+        }
+    }
+
+    if (apHitter && entt::locator<World>::has_value())
         World::Get().GetRunner().Trigger(HitEvent(apHitter->formID, apThis->formID));
+
+    // Ghosted remote players are visual-only and must not be hittable.
+    if (apThis->GetExtension() && apThis->GetExtension()->IsRemotePlayer())
+    {
+        const bool locallyGated = entt::locator<World>::has_value() && World::Get().GetSyncModeService().GetLocalMode() == SyncMode::Ghost;
+        const auto* pNpc = Cast<TESNPC>(apThis->baseForm);
+        const bool isGhostFlagged = pNpc && (pNpc->actorData.flags & (1u << 29));
+
+        if (locallyGated || isGhostFlagged)
+            return false;
+    }
 
     float realDamage = GameplayFormulas::CalculateRealDamage(apThis, aDamage, aKillMove);
 
@@ -1083,25 +1328,81 @@ void TP_MAKE_THISCALL(HookAddInventoryItem, Actor, TESBoundObject* apItem, Extra
 
 void* TP_MAKE_THISCALL(HookPickUpObject, Actor, TESObjectREFR* apObject, int32_t aCount, bool aUnk1, float aUnk2)
 {
-    if (!ScopedInventoryOverride::IsOverriden())
+    const bool isRemotePickup = DropExecution::GetCurrentMode() == DropExecution::Mode::RemotePickup;
+    const bool isLocalPlayer = apThis->GetExtension() && apThis->GetExtension()->IsLocalPlayer();
+    const bool isConnected = World::Get().GetTransport().IsConnected();
+    std::optional<uint64_t> dropId{};
+
+    if (apObject)
     {
-        auto& modSystem = World::Get().GetModSystem();
+        auto handle = apObject->GetHandle();
+        if (handle && handle.handle.iBits)
+            dropId = DropManager::GetDropIdForHandle(handle.handle.iBits);
 
-        Inventory::Entry item{};
-        modSystem.GetServerModId(apObject->baseForm->formID, item.BaseId);
-        item.Count = aCount;
-
-        if (apObject->GetExtraDataList())
-            apThis->GetItemFromExtraData(item, apObject->GetExtraDataList());
-
-        // This is here so that objects that are picked up on both clients, aka non temps, are synced through activation sync.
-        // The inventory change event should always be sent to the server, otherwise the server inventory won't be updated.
-        bool shouldUpdateClients = apObject->IsTemporary() && !ScopedActivateOverride::IsOverriden();
-
-        World::Get().GetRunner().Trigger(InventoryChangeEvent(apThis->formID, std::move(item), false, shouldUpdateClients));
+        if (!dropId)
+        {
+            GameId objectId{};
+            World::Get().GetModSystem().GetServerModId(apObject->baseForm->formID, objectId);
+            if (objectId.ModId || objectId.BaseId)
+                dropId = DropManager::FindDropBySignature(objectId, apObject->position, kDropSearchRadiusSquared);
+        }
     }
 
-    return TiltedPhoques::ThisCall(RealPickUpObject, apThis, apObject, aCount, aUnk1, aUnk2);
+    Inventory::Entry fallbackItem{};
+    const bool hasReferenceObject = apObject != nullptr;
+    if (!dropId && apObject)
+    {
+        auto& modSystem = World::Get().GetModSystem();
+        modSystem.GetServerModId(apObject->baseForm->formID, fallbackItem.BaseId);
+        fallbackItem.Count = aCount;
+
+        if (apObject->GetExtraDataList())
+        {
+            const int32_t engineCount = fallbackItem.Count;
+            apThis->GetItemFromExtraData(fallbackItem, apObject->GetExtraDataList());
+            fallbackItem.Count = engineCount;
+        }
+    }
+
+    if (!isRemotePickup && isLocalPlayer && isConnected)
+    {
+        std::optional<PickupDroppedItemEvent> pickupEvent{};
+
+        if (dropId)
+        {
+            pickupEvent.emplace(apThis->formID, *dropId);
+            PopulatePickupEventFromDrop(*dropId, *pickupEvent);
+        }
+        else if (hasReferenceObject)
+        {
+            pickupEvent.emplace(apThis->formID, 0);
+            PopulatePickupEventFromReference(apObject, fallbackItem, *pickupEvent);
+        }
+
+        if (pickupEvent && apObject)
+            pickupEvent->ReferenceFormId = apObject->formID;
+
+        if (pickupEvent)
+            World::Get().GetRunner().Trigger(*pickupEvent);
+    }
+
+    void* pResult = nullptr;
+    if (!isRemotePickup && isLocalPlayer && isConnected)
+    {
+        DropExecution::Scope scope(DropExecution::Mode::LocalPickup, apThis->formID, dropId.value_or(0));
+        pResult = TiltedPhoques::ThisCall(RealPickUpObject, apThis, apObject, aCount, aUnk1, aUnk2);
+    }
+    else
+    {
+        pResult = TiltedPhoques::ThisCall(RealPickUpObject, apThis, apObject, aCount, aUnk1, aUnk2);
+    }
+
+    if (isRemotePickup)
+    {
+        DropManager::RemoveServerDrop(DropExecution::GetCurrentDrop());
+    }
+
+    return pResult;
 }
 
 void Actor::PickUpObject(TESObjectREFR* apObject, int32_t aCount, bool aUnk1, float aUnk2) noexcept
@@ -1118,13 +1419,108 @@ void* TP_MAKE_THISCALL(HookDropObject, Actor, void* apResult, TESBoundObject* ap
     item.Count = -aCount;
 
     if (apExtraData)
+    {
+        const int32_t engineCount = item.Count;
         apThis->GetItemFromExtraData(item, apExtraData);
+        item.Count = engineCount;
+    }
 
-    World::Get().GetRunner().Trigger(InventoryChangeEvent(apThis->formID, std::move(item), true));
+    const bool shouldSend = !ScopedInventoryOverride::IsOverriden();
+    const bool isLocalPlayer = apThis->GetExtension() && apThis->GetExtension()->IsLocalPlayer();
+    const bool isConnected = World::Get().GetTransport().IsConnected();
+    const bool isRemoteDrop = DropExecution::GetCurrentMode() == DropExecution::Mode::RemoteDrop;
+    std::optional<DropExecution::Scope> localDropScope{};
+    if (!isRemoteDrop)
+        localDropScope.emplace(DropExecution::Mode::LocalDrop, apThis->formID, 0);
 
-    ScopedInventoryOverride _;
+    void* pReturn = nullptr;
+    {
+        ScopedInventoryOverride _;
+        pReturn = TiltedPhoques::ThisCall(RealDropObject, apThis, apResult, apObject, apExtraData, aCount, apLocation, apRotation);
+    }
 
-    return TiltedPhoques::ThisCall(RealDropObject, apThis, apResult, apObject, apExtraData, aCount, apLocation, apRotation);
+    uint32_t handleBits = 0;
+    TESObjectREFR* pDroppedRef = nullptr;
+    if (auto* pHandle = static_cast<BSPointerHandle<TESObjectREFR>*>(apResult); pHandle && *pHandle)
+    {
+        handleBits = pHandle->handle.iBits;
+        if (handleBits)
+            pDroppedRef = TESObjectREFR::GetByHandle(handleBits);
+    }
+
+    NiPoint3 dropLocation = apLocation ? *apLocation : apThis->position;
+    NiPoint3 dropRotation = apRotation ? *apRotation : apThis->rotation;
+
+    if (pDroppedRef)
+    {
+        dropLocation = pDroppedRef->position;
+        dropRotation = pDroppedRef->rotation;
+    }
+
+    if (isRemoteDrop)
+    {
+        if (handleBits)
+        {
+            DropManager::BindHandleToServerDrop(DropExecution::GetCurrentDrop(), DropExecution::GetCurrentActor(), handleBits);
+            if (pDroppedRef)
+            {
+                auto& modSystem = World::Get().GetModSystem();
+                GameId referenceId{};
+                modSystem.GetServerModId(pDroppedRef->formID, referenceId);
+                DropManager::SetReferenceForDrop(DropExecution::GetCurrentDrop(), referenceId);
+            }
+        }
+        return pReturn;
+    }
+
+    if (shouldSend && isLocalPlayer && isConnected)
+    {
+        GameId cellId{};
+        GameId worldId{};
+
+        if (pDroppedRef)
+        {
+            if (auto* pCell = pDroppedRef->GetParentCellEx())
+                modSystem.GetServerModId(pCell->formID, cellId);
+
+            if (auto* pWorld = pDroppedRef->GetWorldSpace())
+                modSystem.GetServerModId(pWorld->formID, worldId);
+        }
+        else if (apThis->parentCell)
+        {
+            modSystem.GetServerModId(apThis->parentCell->formID, cellId);
+            if (apThis->parentCell->worldspace)
+                modSystem.GetServerModId(apThis->parentCell->worldspace->formID, worldId);
+        }
+
+        DropManager::LocalDropData dropData{};
+        dropData.ActorFormId = apThis->formID;
+        dropData.Item = item;
+        dropData.HandleBits = handleBits;
+        dropData.Location = dropLocation;
+        dropData.Rotation = dropRotation;
+        dropData.CellId = cellId;
+        dropData.WorldSpaceId = worldId;
+        if (pDroppedRef)
+        {
+            GameId referenceId{};
+            modSystem.GetServerModId(pDroppedRef->formID, referenceId);
+            dropData.ReferenceId = referenceId;
+        }
+
+        const Guid clientDropId = DropManager::RegisterLocalDrop(dropData);
+        World::Get().GetRunner().Trigger(DropItemEvent(apThis->formID, item, clientDropId, dropLocation, dropRotation, handleBits, cellId, worldId, dropData.ReferenceId));
+
+        if (pDroppedRef)
+        {
+            if (pDroppedRef->IsTemporary())
+                pDroppedRef->Delete();
+            else
+                pDroppedRef->Disable();
+        }
+    }
+
+    return pReturn;
 }
 
 void Actor::DropOrPickUpObject(const Inventory::Entry& arEntry, NiPoint3* apLocation, NiPoint3* apRotation) noexcept
@@ -1143,7 +1539,26 @@ void Actor::DropOrPickUpObject(const Inventory::Entry& arEntry, NiPoint3* apLoca
 
     if (arEntry.Count < 0)
         DropObject(pObject, pExtraData, -arEntry.Count, apLocation, apRotation);
-    // TODO: pick up
+    else if (arEntry.Count > 0)
+    {
+        NiPoint3 searchLocation = apLocation ? *apLocation : position;
+        TESObjectREFR* pDroppedRef = FindDroppedReferenceNear(pObject, searchLocation);
+
+        if (!pDroppedRef && apLocation)
+            pDroppedRef = FindDroppedReferenceNear(pObject, position);
+
+        if (!pDroppedRef)
+        {
+            spdlog::warn("Object to pick up not found near target location, {:X}:{:X}. Falling back to inventory add.", arEntry.BaseId.ModId, arEntry.BaseId.BaseId);
+
+            ScopedInventoryOverride _;
+            AddOrRemoveItem(arEntry, true);
+            return;
+        }
+
+        spdlog::debug("Picking up object, form id: {:X}, count: {}, actor: {:X}", pObject->formID, arEntry.Count, formID);
+        PickUpObject(pDroppedRef, arEntry.Count, false, 0.0f);
+    }
 }
 
 void Actor::DropObject(TESBoundObject* apObject, ExtraDataList* apExtraData, int32_t aCount, NiPoint3* apLocation, NiPoint3* apRotation) noexcept
@@ -1167,6 +1582,23 @@ void TP_MAKE_THISCALL(HookUpdateDetectionState, ActorKnowledge, void* apState)
         auto pTargetActor = Cast<Actor>(pTarget);
         if (pOwnerActor && pTargetActor)
         {
+            const bool ownerGhosted = IsRemoteGhostActor(pOwnerActor);
+            const bool targetGhosted = IsRemoteGhostActor(pTargetActor);
+
+            // Skip detection processing when ghosted remote players are involved; they should be invisible to AI.
+            if (ownerGhosted || targetGhosted)
+            {
+                apThis->hTarget = 0; // Clear detection target so AI loses interest.
+
+                if (targetGhosted && !ownerGhosted && pOwnerActor && !pOwnerActor->GetExtension()->IsRemotePlayer())
+                {
+                    // Ensure local AI drops ghost targets so they don't chase or face them.
+                    if (IsRemoteGhostActor(pOwnerActor->GetCombatTarget()))
+                        pOwnerActor->SetCombatTargetEx(nullptr);
+                }
+                return;
+            }
+
             if (pOwnerActor->GetExtension()->IsRemotePlayer() && pTargetActor->GetExtension()->IsLocalPlayer())
             {
                 spdlog::debug("Cancelling detection from remote player to local player, owner: {:X}, target: {:X}", pOwner->formID, pTarget->formID);

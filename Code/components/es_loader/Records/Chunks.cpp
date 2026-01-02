@@ -2,9 +2,45 @@
 
 #include "Record.h"
 #include <ESLoader.h>
+#include <cstdlib>
+#include <limits>
 
 namespace Chunks
 {
+namespace
+{
+uint32_t GetLimit(const char* aEnv, uint32_t aFallback) noexcept
+{
+    const char* env = std::getenv(aEnv);
+    if (!env || env[0] == '\0')
+        return aFallback;
+    char* end = nullptr;
+    const unsigned long long value = std::strtoull(env, &end, 10);
+    if (!end || end == env || value == 0)
+        return aFallback;
+    if (value > std::numeric_limits<uint32_t>::max())
+        return std::numeric_limits<uint32_t>::max();
+    return static_cast<uint32_t>(value);
+}
+
+uint32_t MaxVmadScripts() noexcept
+{
+    static uint32_t limit = GetLimit("ESLOADER_MAX_VMAD_SCRIPTS", 1024);
+    return limit;
+}
+
+uint32_t MaxVmadProperties() noexcept
+{
+    static uint32_t limit = GetLimit("ESLOADER_MAX_VMAD_PROPERTIES", 4096);
+    return limit;
+}
+
+uint32_t MaxVmadArrayElements() noexcept
+{
+    static uint32_t limit = GetLimit("ESLOADER_MAX_VMAD_ARRAY", 4096);
+    return limit;
+}
+} // namespace
 
 uint32_t ReadFormId(Buffer::Reader& aReader, Map<uint8_t, uint32_t>& aParentToFormIdPrefix)
 {
@@ -13,7 +49,8 @@ uint32_t ReadFormId(Buffer::Reader& aReader, Map<uint8_t, uint32_t>& aParentToFo
 
     uint32_t realBaseId = ESLoader::TESFile::GetFormIdPrefix(formId, aParentToFormIdPrefix);
 
-    formId &= 0x00FFFFFF;
+    const uint32_t mask = ((realBaseId & 0xFF000000u) == 0xFE000000u) ? 0xFFFu : 0x00FFFFFFu;
+    formId &= mask;
     formId += realBaseId;
 
     return formId;
@@ -24,6 +61,12 @@ VMAD::VMAD(Buffer::Reader& aReader, Map<uint8_t, uint32_t>& aParentToFormIdPrefi
     aReader.ReadBytes(reinterpret_cast<uint8_t*>(&m_version), 2);
     aReader.ReadBytes(reinterpret_cast<uint8_t*>(&m_objectFormat), 2);
     aReader.ReadBytes(reinterpret_cast<uint8_t*>(&m_scriptCount), 2);
+
+    if (m_scriptCount > MaxVmadScripts())
+    {
+        spdlog::error("VMAD script count {} exceeds limit {}", m_scriptCount, MaxVmadScripts());
+        return;
+    }
 
     m_scripts.reserve(m_scriptCount);
 
@@ -36,6 +79,12 @@ VMAD::VMAD(Buffer::Reader& aReader, Map<uint8_t, uint32_t>& aParentToFormIdPrefi
         aReader.ReadBytes(&script.m_status, 1);
         aReader.ReadBytes(reinterpret_cast<uint8_t*>(&script.m_propertyCount), 2);
 
+        if (script.m_propertyCount > MaxVmadProperties())
+        {
+            spdlog::error("VMAD property count {} exceeds limit {}", script.m_propertyCount, MaxVmadProperties());
+            return;
+        }
+
         for (uint16_t j = 0; j < script.m_propertyCount; j++)
         {
             ScriptProperty scriptProperty;
@@ -45,7 +94,11 @@ VMAD::VMAD(Buffer::Reader& aReader, Map<uint8_t, uint32_t>& aParentToFormIdPrefi
             aReader.ReadBytes(reinterpret_cast<uint8_t*>(&scriptProperty.m_type), 1);
             aReader.ReadBytes(reinterpret_cast<uint8_t*>(&scriptProperty.m_status), 1);
 
-            scriptProperty.ParseValue(aReader, m_objectFormat, aParentToFormIdPrefix);
+            if (!scriptProperty.ParseValue(aReader, m_objectFormat, aParentToFormIdPrefix))
+            {
+                spdlog::error("VMAD property parse failed");
+                return;
+            }
 
             script.m_properties.push_back(scriptProperty);
         }
@@ -54,7 +107,7 @@ VMAD::VMAD(Buffer::Reader& aReader, Map<uint8_t, uint32_t>& aParentToFormIdPrefi
     }
 }
 
-void ScriptProperty::ParseValue(Buffer::Reader& aReader, int16_t aObjectFormat, Map<uint8_t, uint32_t>& aParentToFormIdPrefix) noexcept
+bool ScriptProperty::ParseValue(Buffer::Reader& aReader, int16_t aObjectFormat, Map<uint8_t, uint32_t>& aParentToFormIdPrefix) noexcept
 {
     switch (m_type)
     {
@@ -91,17 +144,25 @@ void ScriptProperty::ParseValue(Buffer::Reader& aReader, int16_t aObjectFormat, 
     {
         uint32_t sizeOfArray = 0;
         aReader.ReadBytes(reinterpret_cast<uint8_t*>(&sizeOfArray), 4);
+        if (sizeOfArray > MaxVmadArrayElements())
+        {
+            spdlog::error("VMAD array size {} exceeds limit {}", sizeOfArray, MaxVmadArrayElements());
+            return false;
+        }
         for (uint32_t i = 0; i < sizeOfArray; i++)
         {
             ScriptProperty scriptProperty;
             scriptProperty.m_type = GetPropertyType(m_type);
-            ParseValue(aReader, aObjectFormat, aParentToFormIdPrefix);
+            if (!scriptProperty.ParseValue(aReader, aObjectFormat, aParentToFormIdPrefix))
+                return false;
             m_dataArray.push_back(scriptProperty.m_dataSingleValue);
         }
 
         break;
     }
     }
+
+    return true;
 }
 
 ScriptProperty::Type ScriptProperty::GetPropertyType(Type aArrayType) noexcept

@@ -10,6 +10,11 @@
 #include <Messages/ServerTimeSettings.h>
 #include <Messages/CharacterSpawnRequest.h>
 #include <Messages/NotifyInventoryChanges.h>
+#include <Messages/NotifyActorDrop.h>
+#include <Messages/NotifyDroppedItemPickedUp.h>
+#include <Messages/NotifyDroppedItems.h>
+#include <Messages/NotifyDroppedItemMove.h>
+#include <Messages/NotifyDroppedItemPhysicsDisabled.h>
 #include <Messages/NotifyFactionsChanges.h>
 #include <Messages/NotifyRemoveCharacter.h>
 #include <Messages/NotifyQuestUpdate.h>
@@ -18,6 +23,11 @@
 #include <Messages/NotifyPartyInvite.h>
 #include <Messages/NotifyPartyJoined.h>
 #include <Messages/NotifyPartyLeft.h>
+#include <Messages/NotifyTradeInvite.h>
+#include <Messages/NotifyTradeStarted.h>
+#include <Messages/NotifyTradeState.h>
+#include <Messages/NotifyTradeCancel.h>
+#include <Messages/NotifyTradeComplete.h>
 #include <Messages/NotifyActorValueChanges.h>
 #include <Messages/NotifyActorMaxValueChanges.h>
 #include <Messages/NotifyHealthChangeBroadcast.h>
@@ -53,6 +63,9 @@
 #include <Messages/NotifyPlayerJoined.h>
 #include <Messages/NotifyPlayerLevel.h>
 #include <Messages/NotifyPlayerCellChanged.h>
+#include <Messages/NotifyPlayerProfileImage.h>
+#include <Messages/NotifyTeleportRequest.h>
+#include <Messages/NotifyTeleportCountdown.h>
 #include <Messages/NotifyTeleport.h>
 #include <Messages/NotifyPlayerHealthUpdate.h>
 #include <Messages/NotifySettingsChange.h>
@@ -60,6 +73,14 @@
 #include <Messages/NotifySetWaypoint.h>
 #include <Messages/NotifyRemoveWaypoint.h>
 #include <Messages/NotifySetTimeResult.h>
+#include <Messages/NotifyPartyPositions.h>
+#include <Messages/NotifyHealingProximity.h>
+#include <Messages/NotifyPartyMemberDowned.h>
+#include <Messages/NotifyPartyFastTravelMarkers.h>
+#include <Messages/NotifyPlayerSyncMode.h>
+#include <Messages/NotifyCommandList.h>
+#include <Messages/NotifyPlayEmote.h>
+#include <Messages/NotifyCancelEmote.h>
 
 using TiltedPhoques::UniquePtr;
 
@@ -70,11 +91,11 @@ struct ServerMessageFactory
     template <class T> static auto Visit(T&& func)
     {
         auto s_visitor = CreateMessageVisitor<
-            AuthenticationResponse, AssignCharacterResponse, ServerReferencesMoveRequest, ServerTimeSettings, CharacterSpawnRequest, NotifyInventoryChanges, StringCacheUpdate, NotifyFactionsChanges, NotifyRemoveCharacter, NotifyQuestUpdate, NotifyPlayerList, NotifyPartyInfo, NotifyPartyInvite,
-            NotifyActorValueChanges, NotifyPartyJoined, NotifyPartyLeft, NotifyActorMaxValueChanges, NotifyHealthChangeBroadcast, NotifySpawnData, NotifyActivate, NotifyLockChange, AssignObjectsResponse, NotifyDeathStateChange, NotifyOwnershipTransfer, NotifyObjectInventoryChanges, NotifySpellCast,
+            AuthenticationResponse, AssignCharacterResponse, ServerReferencesMoveRequest, ServerTimeSettings, CharacterSpawnRequest, NotifyInventoryChanges, NotifyActorDrop, NotifyDroppedItemPickedUp, NotifyDroppedItems, NotifyDroppedItemMove, NotifyDroppedItemPhysicsDisabled, StringCacheUpdate, NotifyFactionsChanges, NotifyRemoveCharacter, NotifyQuestUpdate, NotifyPlayerList, NotifyPartyInfo, NotifyPartyInvite,
+            NotifyPartyJoined, NotifyPartyLeft, NotifyTradeInvite, NotifyTradeStarted, NotifyTradeState, NotifyTradeCancel, NotifyTradeComplete, NotifyActorValueChanges, NotifyActorMaxValueChanges, NotifyHealthChangeBroadcast, NotifySpawnData, NotifyActivate, NotifyLockChange, AssignObjectsResponse, NotifyDeathStateChange, NotifyOwnershipTransfer, NotifyObjectInventoryChanges, NotifySpellCast,
             NotifyProjectileLaunch, NotifyInterruptCast, NotifyAddTarget, NotifyScriptAnimation, NotifyDrawWeapon, NotifyMount, NotifyNewPackage, NotifyRespawn, NotifySyncExperience, NotifyEquipmentChanges, NotifyChatMessageBroadcast, TeleportCommandResponse, NotifyPlayerRespawn, NotifyDialogue,
-            NotifySubtitle, NotifyPlayerDialogue, NotifyActorTeleport, NotifyRelinquishControl, NotifyPlayerLeft, NotifyPlayerJoined, NotifyDialogue, NotifySubtitle, NotifyPlayerDialogue, NotifyPlayerLevel, NotifyPlayerCellChanged, NotifyTeleport, NotifyPlayerHealthUpdate, NotifySettingsChange,
-            NotifyWeatherChange, NotifySetWaypoint, NotifyRemoveWaypoint, NotifySetTimeResult, NotifyRemoveSpell>;
+            NotifySubtitle, NotifyPlayerDialogue, NotifyActorTeleport, NotifyRelinquishControl, NotifyPlayerLeft, NotifyPlayerJoined, NotifyPlayerProfileImage, NotifyDialogue, NotifySubtitle, NotifyPlayerDialogue, NotifyPlayerLevel, NotifyPlayerCellChanged, NotifyTeleportRequest, NotifyTeleportCountdown, NotifyTeleport, NotifyPlayerHealthUpdate, NotifySettingsChange,
+            NotifyWeatherChange, NotifySetWaypoint, NotifyRemoveWaypoint, NotifySetTimeResult, NotifyPartyPositions, NotifyRemoveSpell, NotifyHealingProximity, NotifyPartyMemberDowned, NotifyPartyFastTravelMarkers, NotifyPlayerSyncMode, NotifyCommandList, NotifyPlayEmote, NotifyCancelEmote>;
 
         return s_visitor(std::forward<T>(func));
     }

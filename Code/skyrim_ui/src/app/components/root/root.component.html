@@ -1,4 +1,8 @@
 <ng-container *ngIf="inGame$ | async">
+  <app-sync-status-badge></app-sync-status-badge>
+  <app-party-pins></app-party-pins>
+  <app-death-screen></app-death-screen>
+  <app-revive-progress></app-revive-progress>
   <ng-container *ngIf="!(menuOpen$ | async)">
     <app-debug></app-debug>
 
@@ -8,6 +12,7 @@
   <app-notification-popup-container
     class="app-notification-popup"
   ></app-notification-popup-container>
+  <app-overlay-banner></app-overlay-banner>
 
   <app-notifications [@notifications]="!(active$ | async)"></app-notifications>
   <div
@@ -16,14 +21,6 @@
     [class.background-element]="view$ | async"
   >
     <app-window border="strip" class="app-root-menu">
-      <button
-        *ngIf="!(connected$ | async) && !(connectionInProgress$ | async)"
-        data-style-ornament="inverted"
-        [attr.data-style-active]="(view$ | async) === RootView.CONNECT"
-        (click)="setView(RootView.CONNECT)"
-      >
-        {{ 'COMPONENT.ROOT.CONNECT' | transloco }}
-      </button>
       <ng-container *ngIf="connected$ | async">
         <button
           data-style-ornament="inverted"
@@ -50,24 +47,34 @@
         </button>
         <button data-style-ornament="inverted" (click)="revealPlayers()">
           <!-- See note in 'root.component.scss' for explanation -->
-          <div style="position: relative;">
+          <div style="position: relative">
             <span
               class="cooldown-supporting-text-normal"
               [class.cooldown-supporting-text-animating]="revealingInProgress$"
             >
               {{ 'COMPONENT.ROOT.REVEAL_PLAYERS' | transloco }}
             </span>
-            <span 
-              style="position: absolute; left: 0; top: 0;"
-              class="text-cooldown-effect" 
+            <span
+              style="position: absolute; left: 0; top: 0"
+              class="text-cooldown-effect"
               [class.cooldown-active]="revealingInProgress$"
-              [style.--cooldown-duration]="revealingInProgress$ ? '10s' : '0.3s'"
+              [style.--cooldown-duration]="
+                revealingInProgress$ ? '10s' : '0.3s'
+              "
             >
               {{ 'COMPONENT.ROOT.REVEAL_PLAYERS' | transloco }}
             </span>
           </div>
         </button>
       </ng-container>
+      <button
+        *ngIf="!(connected$ | async) && !(connectionInProgress$ | async)"
+        data-style-ornament="inverted"
+        [attr.data-style-active]="(view$ | async) === RootView.CONNECT"
+        (click)="setView(RootView.CONNECT)"
+      >
+        {{ 'COMPONENT.ROOT.CONNECT' | transloco }}
+      </button>
       <button
         data-style-ornament="inverted"
         [attr.data-style-active]="(view$ | async) === RootView.SETTINGS"
@@ -86,6 +93,14 @@
     </app-window>
     <app-window class="app-root-chat">
       <app-chat #chat></app-chat>
+      <button
+        class="emote-quick-button"
+        data-style-ornament="inverted"
+        (click)="openEmoteWheel()"
+      >
+        {{ 'COMPONENT.ROOT.EMOTES' | transloco }}
+        <span class="hotkey-tag">B</span>
+      </button>
     </app-window>
   </div>
   <div [@fadeInOutActive]="active$ | async" class="app-root-popups">
@@ -115,6 +130,12 @@
         data-popup="playerManager"
       >
         <app-player-manager (done)="closeView()"></app-player-manager>
+      </app-popup>
+      <app-popup *ngSwitchCase="RootView.EMOTES" data-popup="emotes">
+        <app-emote-menu (done)="closeView()"></app-emote-menu>
+      </app-popup>
+      <app-popup *ngSwitchCase="RootView.TRADE" data-popup="trade">
+        <app-trade-popup></app-trade-popup>
       </app-popup>
     </ng-container>
 

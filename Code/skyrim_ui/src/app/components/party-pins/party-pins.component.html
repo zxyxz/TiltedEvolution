@@ -1,0 +1,26 @@
+<div class="party-pins-layer" *ngIf="pins.length > 0">
+  <ng-container *ngFor="let pin of pins">
+    <div
+      class="pin"
+      [ngClass]="{ oob: pin.oob }"
+      [style.left.px]="pin.x"
+      [style.top.px]="pin.y"
+      [attr.title]="pin.name || ''"
+    >
+      <img
+        [src]="pin.avatar !== undefined && pin.avatar !== '' ? pin.avatar : defaultAvatar"
+        [alt]="pin.name || 'Party member avatar'"
+        draggable="false"
+      />
+    </div>
+    <div
+      class="label"
+      [ngClass]="{ oob: pin.oob }"
+      [style.left.px]="pin.x"
+      [style.top.px]="pin.y + 24"
+      *ngIf="pin.name"
+    >
+      {{ pin.name }}
+    </div>
+  </ng-container>
+</div>

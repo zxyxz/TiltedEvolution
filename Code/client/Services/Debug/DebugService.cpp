@@ -163,11 +163,6 @@ void DebugService::OnUpdate(const UpdateEvent& acUpdateEvent) noexcept
     static std::atomic<bool> s_f7Pressed = false;
     static std::atomic<bool> s_f6Pressed = false;
 
-    if (GetAsyncKeyState(VK_F3) & 0x01)
-    {
-        m_showDebugStuff = !m_showDebugStuff;
-    }
-
 #if (!IS_MASTER)
     if (GetAsyncKeyState(VK_F6))
     {

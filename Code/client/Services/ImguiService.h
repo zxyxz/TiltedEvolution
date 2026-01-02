@@ -4,6 +4,7 @@
 
 struct RenderSystemD3D9;
 struct RenderSystemD3D11;
+struct ImFont; // forward declare from Dear ImGui
 
 /**
  * @brief Draws the ImGui UI.
@@ -25,9 +26,14 @@ struct ImguiService
     LRESULT WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
     void RawInputHandler(RAWINPUT& aRawinput);
 
+    // Returns loaded "Skyrim"-like UI font (Futura Condensed) or nullptr if unavailable
+    ImFont* GetSkyrimFont() const noexcept { return m_skyrimFont; }
+
     entt::sink<entt::sigh<TCallback>> OnDraw;
 
 private:
     ImGuiImpl::ImGuiDriver m_imDriver;
     entt::sigh<TCallback> m_drawSignal;
+
+    ImFont* m_skyrimFont{nullptr};
 };

@@ -2,6 +2,7 @@
 
 #include <Services/InputService.h>
 #include <Services/OverlayService.h>
+#include <Services/OverlayClient.h>
 
 #include <OverlayApp.hpp>
 
@@ -9,11 +10,14 @@
 #include <WindowsHook.hpp>
 
 #include <include/internal/cef_types.h>
+#include <include/cef_values.h>
 #include <Services/ImguiService.h>
 #include <Services/DiscordService.h>
 #include <World.h>
 
 #include "Games/Skyrim/Interface/MenuControls.h"
+#include "Games/Skyrim/Interface/UI.h"
+#include <cstring>
 
 static OverlayService* s_pOverlay = nullptr;
 static UINT s_currentACP = CP_ACP;
@@ -92,10 +96,42 @@ bool IsToggleKey(int aKey) noexcept
     return aKey == VK_RCONTROL || aKey == VK_F2;
 }
 
+static constexpr uint16_t kScanCodeB = 0x30;
+static constexpr uint16_t kVirtualKeyB = 98;
+
+bool IsEmoteKey(uint16_t aVirtualKey, uint16_t aScanCode) noexcept
+{
+    return aVirtualKey == kVirtualKeyB || aScanCode == kScanCodeB;
+}
+
 bool IsDisableKey(int aKey) noexcept
 {
     return aKey == VK_ESCAPE;
 }
+
+bool IsAnyMenuOpen() noexcept
+{
+    UI* pUI = UI::Get();
+    if (!pUI)
+        return false;
+
+    for (auto* pMenu : pUI->menuStack)
+    {
+        if (!pMenu)
+            continue;
+
+        const BSFixedString* pName = pUI->LookupMenuNameByInstance(pMenu);
+        if (pName && (std::strcmp(pName->AsAscii(), "HUD Menu") == 0 || std::strcmp(pName->AsAscii(), "HUDMenu") == 0))
+            continue;
+
+        return true;
+    }
+
+    return false;
+}
+
+static bool s_emoteOpenedFromInactive = false;
+static bool s_f3Pressed = false;
 
 void SetUIActive(OverlayService& aOverlay, auto apRenderer, bool aActive)
 {
@@ -191,6 +227,22 @@ void ProcessKeyboard(uint16_t aKey, uint16_t aScanCode, cef_key_event_type_t aTy
 
     spdlog::debug("ProcessKey, type: {}, key: {}, active: {}", aType, aKey, active);
 
+    if (aType != KEYEVENT_CHAR && aKey == VK_F3)
+    {
+        if (aType == KEYEVENT_KEYDOWN)
+        {
+            if (!s_f3Pressed)
+            {
+                World::Get().GetDebugService().m_showDebugStuff = !World::Get().GetDebugService().m_showDebugStuff;
+                s_f3Pressed = true;
+            }
+        }
+        else if (aType == KEYEVENT_KEYUP)
+        {
+            s_f3Pressed = false;
+        }
+    }
+
     if (aType != KEYEVENT_CHAR && (IsToggleKey(aKey) || (IsDisableKey(aKey) && active)))
     {
         if (!overlay.GetInGame())
@@ -200,6 +252,48 @@ void ProcessKeyboard(uint16_t aKey, uint16_t aScanCode, cef_key_event_type_t aTy
         else if (aType == KEYEVENT_KEYUP)
         {
             SetUIActive(overlay, pRenderer, !active);
+        }
+    }
+    else if (IsEmoteKey(aKey, aScanCode) && (g_emoteWheelActive.load() || (!active && !IsAnyMenuOpen())))
+    {
+        if (!overlay.GetInGame())
+        {
+            if (auto* pApp = overlay.GetOverlayApp())
+            {
+                pApp->InjectKey(aType, GetCefModifiers(aKey), aKey, aScanCode);
+            }
+            return;
+        }
+
+        if (aType == KEYEVENT_CHAR)
+        {
+            const bool wasActive = active;
+            if (!wasActive)
+                SetUIActive(overlay, pRenderer, true);
+
+            auto* pApp = overlay.GetOverlayApp();
+            // If we just activated the overlay, fetch again in case it was spun up.
+            if (!pApp && !wasActive)
+                pApp = overlay.GetOverlayApp();
+            if (pApp)
+            {
+                if (wasActive)
+                {
+                    pApp->ExecuteAsync("toggleEmoteMenu");
+                    if (s_emoteOpenedFromInactive)
+                    {
+                        s_emoteOpenedFromInactive = false;
+                        SetUIActive(overlay, pRenderer, false);
+                    }
+                }
+                else
+                {
+                    auto pArgs = CefListValue::Create();
+                    pArgs->SetBool(0, true); // opened from inactive overlay
+                    pApp->ExecuteAsync("openEmoteMenu", pArgs);
+                    s_emoteOpenedFromInactive = true;
+                }
+            }
         }
     }
     else if (active)

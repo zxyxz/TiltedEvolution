@@ -1,5 +1,7 @@
 #pragma once
 
+#include <Structs/SyncMode.h>
+
 struct ServerMessage;
 struct Player
 {
@@ -17,10 +19,12 @@ struct Player
     [[nodiscard]] std::optional<entt::entity> GetCharacter() const noexcept { return m_character; }
     [[nodiscard]] PartyComponent& GetParty() noexcept { return m_party; }
     [[nodiscard]] const String& GetUsername() const noexcept { return m_username; }
+    [[nodiscard]] const String& GetAvatar() const noexcept { return m_avatar; }
     [[nodiscard]] const String& GetEndPoint() const noexcept { return m_endpoint; }
     [[nodiscard]] const uint64_t GetDiscordId() const noexcept { return m_discordId; }
     [[nodiscard]] const uint32_t GetStringCacheId() const noexcept { return m_stringCacheId; }
     [[nodiscard]] const uint16_t GetLevel() const noexcept { return m_level; }
+    [[nodiscard]] SyncMode GetSyncMode() const noexcept { return m_syncMode; }
 
     [[nodiscard]] CellIdComponent& GetCellComponent() noexcept;
     [[nodiscard]] const CellIdComponent& GetCellComponent() const noexcept;
@@ -30,12 +34,14 @@ struct Player
     void SetDiscordId(uint64_t aDiscordId) noexcept;
     void SetEndpoint(String aEndpoint) noexcept;
     void SetUsername(String aUsername) noexcept;
+    void SetAvatar(String aAvatar) noexcept;
     void SetMods(Vector<String> aMods) noexcept;
     void SetModIds(Vector<uint16_t> aModIds) noexcept;
     void SetCharacter(entt::entity aCharacter) noexcept;
     void SetStringCacheId(uint32_t aStringCacheId) noexcept;
     // TODO(cosideci): update on level up
     void SetLevel(uint16_t aLevel) noexcept;
+    void SetSyncMode(SyncMode aMode) noexcept { m_syncMode = aMode; }
 
     void SetCellComponent(const CellIdComponent& aCellComponent) noexcept;
 
@@ -50,9 +56,11 @@ private:
     uint64_t m_discordId{0};
     String m_endpoint;
     String m_username;
+    String m_avatar;
     PartyComponent m_party;
     QuestLogComponent m_questLog;
     CellIdComponent m_cell;
     uint32_t m_stringCacheId{0};
     uint16_t m_level{0};
+    SyncMode m_syncMode{SyncMode::Normal};
 };

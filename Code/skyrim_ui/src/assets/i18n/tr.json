@@ -62,7 +62,17 @@
         "TELEPORT": "Işınla",
         "MAKE_LEADER": "Lider yap"
       },
-      "LEAVE_PARTY": "Partiden çık"
+      "LEAVE_PARTY": "Partiden çık",
+      "PROFILE_PICTURE": {
+        "TITLE": "Profil resmi",
+        "DESCRIPTION": "Partinizde ve dünya haritasında gösterilir.",
+        "UPLOAD": "Resim yükle",
+        "REMOVE": "Resmi kaldır",
+        "SIZE_LIMIT": "PNG veya JPG, otomatik olarak 128x128 boyutuna ölçeklenir (en fazla 256 KB).",
+        "ERROR_SIZE": "Resim çok büyük (en fazla 256 KB).",
+        "ERROR_TYPE": "Desteklenmeyen dosya türü. Lütfen PNG veya JPG kullanın.",
+        "ERROR_PROCESS": "Resim işlenemedi. Lütfen başka bir PNG veya JPG deneyin."
+      }
     },
     "PARTY_LIST": {
       "NO_OTHER_PLAYERS": "Kimsecikler yok.",
@@ -168,6 +178,9 @@
         "MODS_MISMATCH_INSTALL": "Katılmak için lütfen bu modları indirin:\n{{mods}}",
         "CLIENT_MODS_DISALLOWED": "Bu sunucu {{mods}} modlarını kabul etmiyor. Katılmak için lütfen siliniz.",
         "WRONG_PASSWORD": "Girdiğiniz parola yanlış.",
+        "WRONG_ACCOUNT_PASSWORD": "Girdiğiniz hesap parolası yanlış.",
+        "WRONG_SERVER_PASSWORD": "Girdiğiniz sunucu parolası yanlış.",
+        "DUPLICATE_USER": "Bu sunucuya zaten bağlısınız.",
         "NO_REASON": "Sunucu sebep vermeden bağlantıyı reddetti.",
         "SERVER_FULL": "Sunucu Dolu.",
         "BAD_UGRIDSTOLOAD": "Görünüşe göre Skyrim.ini dosyanız 'uGridsToLoad' için varsayılan değerde değil. BU ÇOK KÖTÜ BİR FİKİR, ve muhtemelen modu bozar. Lütfen bu ayarı varsayılana çekiniz (5), ya da Skyrim.ini dosyasını silip Skyrim'ı vanilla olarak başlatıp yenisini oluşturun. 'uExterior Cell Buffer' ve 'uInterior Cell Buffer' ayarları varsayılan olarak kalmalı. Bunu nasıl yapacağınızı bilmiyorsanız, Lütfen wiki sayfamıza bakın veya Discord sunucusu/Reddit üzerinden yardım isteyiniz.",

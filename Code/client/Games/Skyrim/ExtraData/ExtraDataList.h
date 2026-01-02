@@ -23,6 +23,7 @@ struct ExtraDataList
     BSExtraData* GetByType(ExtraDataType type) const;
 
     void SetSoulData(SOUL_LEVEL aSoulLevel) noexcept;
+    void SetCount(uint16_t aCount) noexcept;
     void SetChargeData(float aCharge) noexcept;
     void SetWorn(bool aWornLeft) noexcept;
     void SetPoison(AlchemyItem* apItem, uint32_t aCount) noexcept;

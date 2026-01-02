@@ -5,6 +5,7 @@
 
 #include <Services/CharacterService.h>
 #include <Services/QuestService.h>
+#include <Services/SyncModeService.h>
 #include <Services/TransportService.h>
 
 #include <Games/References.h>
@@ -15,6 +16,7 @@
 
 #include <BranchInfo.h>
 #include <Components.h>
+#include <TiltedCore/Stl.hpp>
 
 #include <Systems/InterpolationSystem.h>
 #include <Systems/AnimationSystem.h>
@@ -38,6 +40,7 @@
 #include <Structs/ActionEvent.h>
 #include <Messages/CancelAssignmentRequest.h>
 #include <Messages/AssignCharacterRequest.h>
+#include <ExtraData/ExtraContainerChanges.h>
 #include <Messages/AssignCharacterResponse.h>
 #include <Messages/ServerReferencesMoveRequest.h>
 #include <Messages/ClientReferencesMoveRequest.h>
@@ -112,6 +115,8 @@ CharacterService::CharacterService(World& aWorld, entt::dispatcher& aDispatcher,
     m_relinquishConnection = m_dispatcher.sink<NotifyRelinquishControl>().connect<&CharacterService::OnNotifyRelinquishControl>(this);
 
     m_partyJoinedConnection = aDispatcher.sink<PartyJoinedEvent>().connect<&CharacterService::OnPartyJoinedEvent>(this);
+
+    EventDispatcherManager::Get()->loadGameEvent.RegisterSink(this);
 }
 
 void CharacterService::DeleteRemoteEntityComponents(entt::entity aEntity) const noexcept
@@ -234,6 +239,12 @@ void CharacterService::OnActorRemoved(const ActorRemovedEvent& acEvent) noexcept
 
 void CharacterService::OnUpdate(const UpdateEvent& acUpdateEvent) noexcept
 {
+    if (m_pendingLoadCleanup && !m_transport.IsOnline())
+    {
+        CleanupRemoteActorsAndOwnership(/*aFromLoad*/ true);
+        m_pendingLoadCleanup = false;
+    }
+
     RunSpawnUpdates();
     RunLocalUpdates();
     RunFactionsUpdates();
@@ -254,11 +265,19 @@ void CharacterService::OnConnected(const ConnectedEvent& acConnectedEvent) const
         // Delete all temporary actors on connect
         if (formIdComponent.Id > 0xFF000000)
         {
-            Actor* pActor = Cast<Actor>(TESForm::GetById(formIdComponent.Id));
-            if (pActor)
-                pActor->Delete();
-
-            continue;
+            // If we are in Quest Isolation (Ghost Mode), do not delete temporary actors.
+            // These are likely local quest NPCs that we need to keep.
+            if (m_world.GetSyncModeService().GetLocalMode() == SyncMode::Ghost)
+            {
+                // Fallthrough to ProcessNewEntity, which will also likely ignore them due to Ghost Mode rules.
+            }
+            else
+            {
+                Actor* pActor = Cast<Actor>(TESForm::GetById(formIdComponent.Id));
+                if (pActor)
+                    pActor->Delete();
+                continue;
+            }
         }
 
         ProcessNewEntity(entity);
@@ -267,22 +286,92 @@ void CharacterService::OnConnected(const ConnectedEvent& acConnectedEvent) const
 
 void CharacterService::OnDisconnected(const DisconnectedEvent& acDisconnectedEvent) const noexcept
 {
+    const_cast<CharacterService*>(this)->m_pendingLoadCleanup = false;
+    CleanupRemoteActorsAndOwnership(/*aFromLoad*/ false);
+}
+
+void CharacterService::CleanupRemoteActorsAndOwnership(const bool aFromLoad) const noexcept
+{
     auto remoteView = m_world.view<FormIdComponent, RemoteComponent>();
-    for (auto entity : remoteView)
+    TiltedPhoques::Vector<entt::entity> remoteEntities(remoteView.begin(), remoteView.end());
+    for (auto entity : remoteEntities)
     {
         auto& formIdComponent = remoteView.get<FormIdComponent>(entity);
 
-        auto pActor = Cast<Actor>(TESForm::GetById(formIdComponent.Id));
-        if (!pActor)
+        if (aFromLoad)
+        {
+            if (m_world.valid(entity))
+            {
+                if (m_world.all_of<GhostComponent>(entity))
+                    m_world.remove<GhostComponent>(entity);
+                if (m_world.all_of<RemoteComponent>(entity))
+                    m_world.remove<RemoteComponent>(entity);
+            }
             continue;
+        }
 
-        if (pActor->GetExtension()->IsRemotePlayer())
-            pActor->Delete();
-        else
-            pActor->GetExtension()->SetRemote(false);
+        auto pActor = Cast<Actor>(TESForm::GetById(formIdComponent.Id));
+        if (pActor)
+        {
+            if (pActor->GetExtension()->IsRemotePlayer())
+                pActor->Delete();
+            else
+                pActor->GetExtension()->SetRemote(false);
+        }
+
+        if (m_world.valid(entity) && m_world.all_of<RemoteComponent>(entity))
+            m_world.remove<RemoteComponent>(entity);
     }
 
-    m_world.clear<WaitingForAssignmentComponent, LocalComponent, RemoteComponent>();
+    auto localView = m_world.view<LocalComponent, FormIdComponent>();
+    TiltedPhoques::Vector<entt::entity> localEntities(localView.begin(), localView.end());
+    for (auto entity : localEntities)
+    {
+        if (m_world.valid(entity))
+            m_world.remove<LocalAnimationComponent, LocalComponent>(entity);
+    }
+
+    m_world.clear<WaitingForAssignmentComponent>();
+}
+
+void CharacterService::OnSyncModeChanged(const SyncMode aPreviousMode, const SyncMode aCurrentMode) noexcept
+{
+    if (aPreviousMode == aCurrentMode)
+        return;
+
+    if (aCurrentMode == SyncMode::Ghost)
+    {
+        // Drop any local ownership/assignment requests (except the player) so others can safely control actors while we are isolated.
+        auto view = m_world.view<FormIdComponent>();
+        TiltedPhoques::Vector<entt::entity> entities(view.begin(), view.end());
+        for (auto entity : entities)
+        {
+            const auto& formIdComponent = view.get<FormIdComponent>(entity);
+            if (formIdComponent.Id == 0x14)
+                continue;
+
+            if (m_world.all_of<LocalComponent>(entity) || m_world.all_of<WaitingForAssignmentComponent>(entity))
+                CancelServerAssignment(entity, formIdComponent.Id);
+        }
+    }
+
+    if (aPreviousMode == SyncMode::Ghost && aCurrentMode == SyncMode::Normal)
+    {
+        // After leaving isolation, re-evaluate assignments so ownership and replication snap back to the right owner (e.g., party leader).
+        auto view = m_world.view<FormIdComponent>(entt::exclude<ObjectComponent>);
+        TiltedPhoques::Vector<entt::entity> entities(view.begin(), view.end());
+        for (auto entity : entities)
+            ProcessNewEntity(entity);
+    }
+}
+
+BSTEventResult CharacterService::OnEvent(const TESLoadGameEvent*, const EventDispatcher<TESLoadGameEvent>*) 
+{
+    // Clear any ghost visuals from the previous world before we tear down components.
+    m_world.GetSyncModeService().OnLoadGameReset();
+    // Defer cleanup to the next update tick to avoid doing heavy deletes inside the load event.
+    m_pendingLoadCleanup = true;
+    return BSTEventResult::kOk;
 }
 
 void CharacterService::OnAssignCharacter(const AssignCharacterResponse& acMessage) noexcept
@@ -361,12 +450,20 @@ void CharacterService::OnAssignCharacter(const AssignCharacterResponse& acMessag
 #endif
 
         pActor->SetActorValues(acMessage.AllActorValues);
-        pActor->SetActorInventory(acMessage.CurrentInventory);
 
-        if (pActor->IsDead() != acMessage.IsDead)
-            acMessage.IsDead ? pActor->Kill() : pActor->Respawn();
+        if (pActor->GetNiNode())
+        {
+            pActor->SetActorInventory(acMessage.CurrentInventory);
 
-        m_weaponDrawUpdates[pActor->formID] = {acMessage.IsWeaponDrawn};
+            if (pActor->IsDead() != acMessage.IsDead)
+                acMessage.IsDead ? pActor->Kill() : pActor->Respawn();
+
+            m_weaponDrawUpdates[pActor->formID] = {acMessage.IsWeaponDrawn};
+        }
+        else
+        {
+            m_world.emplace_or_replace<PendingInventoryComponent>(cEntity, acMessage.CurrentInventory, acMessage.IsDead, acMessage.IsWeaponDrawn);
+        }
 
         MoveActor(pActor, acMessage.WorldSpaceId, acMessage.CellId, acMessage.Position);
     }
@@ -374,6 +471,9 @@ void CharacterService::OnAssignCharacter(const AssignCharacterResponse& acMessag
 
 void CharacterService::OnCharacterSpawn(const CharacterSpawnRequest& acMessage) const noexcept
 {
+    if (m_world.GetSyncModeService().GetLocalMode() == SyncMode::Ghost && !acMessage.IsPlayer)
+        return;
+
     auto remoteView = m_world.view<RemoteComponent>();
     const auto remoteItor = std::find_if(std::begin(remoteView), std::end(remoteView), [remoteView, Id = acMessage.ServerId](auto entity) { return remoteView.get<RemoteComponent>(entity).Id == Id; });
 
@@ -507,6 +607,17 @@ void CharacterService::OnCharacterSpawn(const CharacterSpawnRequest& acMessage) 
 
 void CharacterService::OnRemoteSpawnDataReceived(const NotifySpawnData& acMessage) noexcept
 {
+    const bool ghosting = (m_world.GetSyncModeService().GetLocalMode() == SyncMode::Ghost);
+    if (ghosting)
+    {
+        // While ghosting, only apply spawn data for remote players (to keep their visuals/equipment updated).
+        auto remotePlayerView = m_world.view<RemoteComponent, PlayerComponent>();
+        const auto it = std::find_if(remotePlayerView.begin(), remotePlayerView.end(),
+            [remotePlayerView, id = acMessage.Id](entt::entity e) { return remotePlayerView.get<RemoteComponent>(e).Id == id; });
+        if (it == remotePlayerView.end())
+            return;
+    }
+
     auto view = m_world.view<FormIdComponent>(entt::exclude<ObjectComponent>);
 
     const auto itor = std::find_if(
@@ -538,12 +649,40 @@ void CharacterService::OnRemoteSpawnDataReceived(const NotifySpawnData& acMessag
     if (!pActor)
         return;
 
-    pActor->SetActorValues(acMessage.NewActorData.InitialActorValues);
-    pActor->SetActorInventory(acMessage.NewActorData.InitialInventory);
-    m_weaponDrawUpdates[pActor->formID] = {acMessage.NewActorData.IsWeaponDrawn};
+    if (ghosting)
+    {
+        // Quest isolation: equipment-only update so ghosts aren't naked, without syncing other state.
+        Inventory equipmentOnly = acMessage.NewActorData.InitialInventory;
+        equipmentOnly.RemoveByFilter([](const Inventory::Entry& aEntry) { return !aEntry.IsWorn(); });
 
-    if (pActor->IsDead() != acMessage.NewActorData.IsDead)
-        acMessage.NewActorData.IsDead ? pActor->Kill() : pActor->Respawn();
+        if (pActor->GetNiNode())
+        {
+            pActor->SetActorInventory(equipmentOnly);
+            m_weaponDrawUpdates[pActor->formID] = {acMessage.NewActorData.IsWeaponDrawn};
+        }
+        else
+        {
+            const bool currentDead = pActor->IsDead();
+            m_world.emplace_or_replace<PendingInventoryComponent>(*itor, std::move(equipmentOnly), currentDead, acMessage.NewActorData.IsWeaponDrawn);
+        }
+    }
+    else
+    {
+        pActor->SetActorValues(acMessage.NewActorData.InitialActorValues);
+
+        if (pActor->GetNiNode())
+        {
+            pActor->SetActorInventory(acMessage.NewActorData.InitialInventory);
+            m_weaponDrawUpdates[pActor->formID] = {acMessage.NewActorData.IsWeaponDrawn};
+
+            if (pActor->IsDead() != acMessage.NewActorData.IsDead)
+                acMessage.NewActorData.IsDead ? pActor->Kill() : pActor->Respawn();
+        }
+        else
+        {
+            m_world.emplace_or_replace<PendingInventoryComponent>(*itor, acMessage.NewActorData.InitialInventory, acMessage.NewActorData.IsDead, acMessage.NewActorData.IsWeaponDrawn);
+        }
+    }
 
     spdlog::info("Applied remote spawn data, actor form id: {:X}", pActor->formID);
 }
@@ -557,6 +696,9 @@ void CharacterService::OnReferencesMoveRequest(const ServerReferencesMoveRequest
         auto itor = std::find_if(std::begin(view), std::end(view), [serverId = serverId, view](entt::entity entity) { return view.get<RemoteComponent>(entity).Id == serverId; });
 
         if (itor == std::end(view))
+            continue;
+
+        if (m_world.GetSyncModeService().GetLocalMode() == SyncMode::Ghost && !m_world.any_of<PlayerComponent>(*itor))
             continue;
 
         auto& interpolationComponent = view.get<InterpolationComponent>(*itor);
@@ -667,6 +809,42 @@ void CharacterService::OnRemoveCharacter(const NotifyRemoveCharacter& acMessage)
 
         DeleteRemoteEntityComponents(*itor);
     }
+}
+
+void CharacterService::RefreshRemotePlayer(const uint32_t aServerId) noexcept
+{
+    if (!m_transport.IsOnline())
+        return;
+
+    auto view = m_world.view<RemoteComponent>();
+    const auto itor = std::find_if(std::begin(view), std::end(view), [id = aServerId, view](entt::entity entity) { return view.get<RemoteComponent>(entity).Id == id; });
+    if (itor == std::end(view))
+        return;
+
+    const auto entity = *itor;
+    if (!m_world.any_of<PlayerComponent>(entity))
+        return;
+
+    if (auto* pFormIdComponent = m_world.try_get<FormIdComponent>(entity))
+    {
+        CancelServerAssignment(entity, pFormIdComponent->Id);
+
+        if (Actor* pActor = Cast<Actor>(TESForm::GetById(pFormIdComponent->Id)); pActor && pActor->GetExtension()->IsRemotePlayer())
+            pActor->Delete();
+    }
+
+    DeleteRemoteEntityComponents(entity);
+
+    if (m_world.all_of<FormIdComponent>(entity))
+        m_world.remove<FormIdComponent>(entity);
+
+    if (m_world.orphan(entity))
+        m_world.destroy(entity);
+
+    RequestRespawn request;
+    request.ActorId = aServerId;
+
+    m_transport.Send(request);
 }
 
 void CharacterService::OnNotifyRespawn(const NotifyRespawn& acMessage) const noexcept
@@ -787,6 +965,9 @@ void CharacterService::OnMountEvent(const MountEvent& acEvent) const noexcept
 
 void CharacterService::OnNotifyMount(const NotifyMount& acMessage) const noexcept
 {
+    if (m_world.GetSyncModeService().GetLocalMode() == SyncMode::Ghost)
+        return;
+
     auto remoteView = m_world.view<RemoteComponent, FormIdComponent>();
 
     const auto riderIt = std::find_if(std::begin(remoteView), std::end(remoteView), [remoteView, Id = acMessage.RiderId](auto entity) { return remoteView.get<RemoteComponent>(entity).Id == Id; });
@@ -873,6 +1054,9 @@ void CharacterService::OnInitPackageEvent(const InitPackageEvent& acEvent) const
 
 void CharacterService::OnNotifyNewPackage(const NotifyNewPackage& acMessage) const noexcept
 {
+    if (m_world.GetSyncModeService().GetLocalMode() == SyncMode::Ghost)
+        return;
+
     auto remoteView = m_world.view<RemoteComponent, FormIdComponent>();
     const auto remoteIt = std::find_if(std::begin(remoteView), std::end(remoteView), [remoteView, Id = acMessage.ActorId](auto entity) { return remoteView.get<RemoteComponent>(entity).Id == Id; });
 
@@ -917,7 +1101,7 @@ void CharacterService::OnNotifySyncExperience(const NotifySyncExperience& acMess
 
 void CharacterService::OnDialogueEvent(const DialogueEvent& acEvent) noexcept
 {
-    if (!m_transport.IsConnected())
+    if (!m_transport.IsConnected() || m_world.GetSyncModeService().GetLocalMode() == SyncMode::Ghost)
         return;
 
     auto view = m_world.view<FormIdComponent>(entt::exclude<ObjectComponent>);
@@ -942,6 +1126,9 @@ void CharacterService::OnDialogueEvent(const DialogueEvent& acEvent) noexcept
 
 void CharacterService::OnNotifyDialogue(const NotifyDialogue& acMessage) noexcept
 {
+    if (m_world.GetSyncModeService().GetLocalMode() == SyncMode::Ghost)
+        return;
+
     auto remoteView = m_world.view<RemoteComponent, FormIdComponent>();
     const auto remoteIt = std::find_if(std::begin(remoteView), std::end(remoteView), [remoteView, Id = acMessage.ServerId](auto entity) { return remoteView.get<RemoteComponent>(entity).Id == Id; });
 
@@ -958,13 +1145,16 @@ void CharacterService::OnNotifyDialogue(const NotifyDialogue& acMessage) noexcep
     if (!pActor)
         return;
 
+    if (m_world.all_of<GhostComponent>(*remoteIt))
+        return;
+
     pActor->StopCurrentDialogue(true);
     pActor->SpeakSound(acMessage.SoundFilename.c_str());
 }
 
 void CharacterService::OnSubtitleEvent(const SubtitleEvent& acEvent) noexcept
 {
-    if (!m_transport.IsConnected())
+    if (!m_transport.IsConnected() || m_world.GetSyncModeService().GetLocalMode() == SyncMode::Ghost)
         return;
 
     auto view = m_world.view<FormIdComponent>(entt::exclude<ObjectComponent>);
@@ -990,6 +1180,9 @@ void CharacterService::OnSubtitleEvent(const SubtitleEvent& acEvent) noexcept
 
 void CharacterService::OnNotifySubtitle(const NotifySubtitle& acMessage) noexcept
 {
+    if (m_world.GetSyncModeService().GetLocalMode() == SyncMode::Ghost)
+        return;
+
     auto remoteView = m_world.view<RemoteComponent, FormIdComponent>();
     const auto remoteIt = std::find_if(std::begin(remoteView), std::end(remoteView), [remoteView, Id = acMessage.ServerId](auto entity) { return remoteView.get<RemoteComponent>(entity).Id == Id; });
 
@@ -1004,6 +1197,9 @@ void CharacterService::OnNotifySubtitle(const NotifySubtitle& acMessage) noexcep
     Actor* pActor = Cast<Actor>(pForm);
 
     if (!pActor)
+        return;
+
+    if (m_world.all_of<GhostComponent>(*remoteIt))
         return;
 
     // This is only for fallout 4
@@ -1064,6 +1260,9 @@ void CharacterService::OnNotifyRelinquishControl(const NotifyRelinquishControl& 
 
 void CharacterService::OnNotifyActorTeleport(const NotifyActorTeleport& acMessage) noexcept
 {
+    if (m_world.GetSyncModeService().GetLocalMode() == SyncMode::Ghost)
+        return;
+
     auto& modSystem = m_world.GetModSystem();
 
     const uint32_t cActorId = World::Get().GetModSystem().GetGameId(acMessage.FormId);
@@ -1127,6 +1326,7 @@ void CharacterService::ProcessNewEntity(entt::entity aEntity) const noexcept
         return;
 
     auto& formIdComponent = m_world.get<FormIdComponent>(aEntity);
+    const bool ghosting = (m_world.GetSyncModeService().GetLocalMode() == SyncMode::Ghost);
 
     Actor* const pActor = Cast<Actor>(TESForm::GetById(formIdComponent.Id));
     if (!pActor)
@@ -1137,6 +1337,9 @@ void CharacterService::ProcessNewEntity(entt::entity aEntity) const noexcept
 
     if (auto* pRemoteComponent = m_world.try_get<RemoteComponent>(aEntity); pRemoteComponent)
     {
+        if (ghosting)
+            return;
+
         // TODO(cosideci): don't just take all actors (i.e. from other parties),
         // maybe check it server side, add a variable to the request.
         if (m_world.GetPartyService().IsLeader() && !pActor->IsTemporary() && !pActor->IsMount())
@@ -1154,6 +1357,10 @@ void CharacterService::ProcessNewEntity(entt::entity aEntity) const noexcept
     if (m_world.any_of<RemoteComponent, LocalComponent, WaitingForAssignmentComponent>(aEntity))
         return;
 
+    // During ghost isolation, only the local player is allowed to enter server ownership/assignment flows.
+    if (ghosting && formIdComponent.Id != 0x14)
+        return;
+
     CacheSystem::Setup(World::Get(), aEntity, pActor);
 
     RequestServerAssignment(aEntity);
@@ -1167,6 +1374,8 @@ void CharacterService::RequestServerAssignment(const entt::entity aEntity) const
     static uint32_t sCookieSeed = 0;
 
     const auto& formIdComponent = m_world.get<FormIdComponent>(aEntity);
+    if (m_world.GetSyncModeService().GetLocalMode() == SyncMode::Ghost && formIdComponent.Id != 0x14)
+        return;
 
     auto* pActor = Cast<Actor>(TESForm::GetById(formIdComponent.Id));
     if (!pActor)
@@ -1204,6 +1413,7 @@ void CharacterService::RequestServerAssignment(const entt::entity aEntity) const
 
     // Serialize the base form
     const auto isPlayer = (formIdComponent.Id == 0x14);
+    const bool ghosting = (m_world.GetSyncModeService().GetLocalMode() == SyncMode::Ghost);
     const auto isTemporary = pActor->formID >= 0xFF000000;
 
     if (isPlayer)
@@ -1241,23 +1451,26 @@ void CharacterService::RequestServerAssignment(const entt::entity aEntity) const
     if (isPlayer)
     {
         auto& questLog = message.QuestContent.Entries;
-        auto& modSystem = m_world.GetModSystem();
 
-        for (const auto& objective : PlayerCharacter::Get()->objectives)
+        if (!ghosting)
         {
-            auto* pQuest = objective.instance->quest;
-            if (!pQuest)
-                continue;
-
-            if (!QuestService::IsNonSyncableQuest(pQuest))
+            auto& modSystem = m_world.GetModSystem();
+            for (const auto& objective : PlayerCharacter::Get()->objectives)
             {
-                GameId id{};
+                auto* pQuest = objective.instance->quest;
+                if (!pQuest)
+                    continue;
 
-                if (modSystem.GetServerModId(pQuest->formID, id))
+                if (!QuestService::IsNonSyncableQuest(pQuest))
                 {
-                    auto& entry = questLog.emplace_back();
-                    entry.Stage = pQuest->currentStage;
-                    entry.Id = id;
+                    GameId id{};
+
+                    if (modSystem.GetServerModId(pQuest->formID, id))
+                    {
+                        auto& entry = questLog.emplace_back();
+                        entry.Stage = pQuest->currentStage;
+                        entry.Id = id;
+                    }
                 }
             }
         }
@@ -1267,9 +1480,21 @@ void CharacterService::RequestServerAssignment(const entt::entity aEntity) const
         questLog.resize(std::distance(questLog.begin(), ip));
     }
 
-    message.CurrentActorData = BuildActorData(pActor);
+    if (ghosting)
+    {
+        message.CurrentActorData.InitialActorValues = pActor->GetEssentialActorValues();
+        // Quest isolation: still send equipment only so other clients can render this player as a properly equipped ghost.
+        // Keep the full inventory isolated.
+        message.CurrentActorData.InitialInventory = isPlayer ? pActor->GetEquipment() : Inventory{};
+        message.CurrentActorData.IsDead = pActor->IsDead();
+        message.CurrentActorData.IsWeaponDrawn = pActor->actorState.IsWeaponFullyDrawn();
+    }
+    else
+    {
+        message.CurrentActorData = BuildActorData(pActor);
+    }
 
-    message.FactionsContent = pActor->GetFactions();
+    message.FactionsContent = ghosting ? Factions{} : pActor->GetFactions();
     message.IsDragon = pActor->IsDragon();
     message.IsMount = pActor->IsMount();
     message.IsPlayerSummon = pActor->GetCommandingActor() && pActor->GetCommandingActor()->formID == 0x14;
@@ -1304,6 +1529,8 @@ void CharacterService::RequestServerAssignment(const entt::entity aEntity) const
 
 void CharacterService::CancelServerAssignment(const entt::entity aEntity, const uint32_t aFormId) const noexcept
 {
+    const bool connected = m_transport.IsOnline();
+
     if (m_world.all_of<RemoteComponent>(aEntity))
     {
         Actor* pActor = Cast<Actor>(TESForm::GetById(aFormId));
@@ -1331,10 +1558,13 @@ void CharacterService::CancelServerAssignment(const entt::entity aEntity, const 
     {
         auto& waitingComponent = m_world.get<WaitingForAssignmentComponent>(aEntity);
 
-        CancelAssignmentRequest message;
-        message.Cookie = waitingComponent.Cookie;
+        if (connected)
+        {
+            CancelAssignmentRequest message;
+            message.Cookie = waitingComponent.Cookie;
 
-        m_transport.Send(message);
+            m_transport.Send(message);
+        }
 
         m_world.remove<WaitingForAssignmentComponent>(aEntity);
     }
@@ -1343,37 +1573,40 @@ void CharacterService::CancelServerAssignment(const entt::entity aEntity, const 
     {
         auto& localComponent = m_world.get<LocalComponent>(aEntity);
 
-        RequestOwnershipTransfer request{};
-        request.ServerId = localComponent.Id;
-
-        if (Actor* pActor = Cast<Actor>(TESForm::GetById(aFormId)))
+        if (connected)
         {
-            if (!pActor->IsTemporary())
+            RequestOwnershipTransfer request{};
+            request.ServerId = localComponent.Id;
+
+            if (Actor* pActor = Cast<Actor>(TESForm::GetById(aFormId)))
             {
-                auto& modSystem = m_world.GetModSystem();
-
-                if (TESWorldSpace* pWorldSpace = pActor->GetWorldSpace())
+                if (!pActor->IsTemporary())
                 {
-                    if (!modSystem.GetServerModId(pWorldSpace->formID, request.WorldSpaceId))
-                        spdlog::error("World space id not found, despite having a world space, {:X}", pWorldSpace->formID);
-                }
+                    auto& modSystem = m_world.GetModSystem();
 
-                if (TESObjectCELL* pCell = pActor->GetParentCell())
-                {
-                    if (!modSystem.GetServerModId(pCell->formID, request.CellId))
-                        spdlog::error("Cell id not found, despite having a cell, {:X}", pCell->formID);
-                }
+                    if (TESWorldSpace* pWorldSpace = pActor->GetWorldSpace())
+                    {
+                        if (!modSystem.GetServerModId(pWorldSpace->formID, request.WorldSpaceId))
+                            spdlog::error("World space id not found, despite having a world space, {:X}", pWorldSpace->formID);
+                    }
 
-                request.Position = pActor->position;
+                    if (TESObjectCELL* pCell = pActor->GetParentCell())
+                    {
+                        if (!modSystem.GetServerModId(pCell->formID, request.CellId))
+                            spdlog::error("Cell id not found, despite having a cell, {:X}", pCell->formID);
+                    }
+
+                    request.Position = pActor->position;
+                }
             }
+
+            spdlog::info(
+                "Transferring ownership of local actor, server id: {:X}, worldspace: {:X}, cell: {:X}, position: "
+                "({}, {}, {})",
+                request.ServerId, request.WorldSpaceId.BaseId, request.CellId.BaseId, request.Position.x, request.Position.y, request.Position.z);
+
+            m_transport.Send(request);
         }
-
-        spdlog::info(
-            "Transferring ownership of local actor, server id: {:X}, worldspace: {:X}, cell: {:X}, position: "
-            "({}, {}, {})",
-            request.ServerId, request.WorldSpaceId.BaseId, request.CellId.BaseId, request.Position.x, request.Position.y, request.Position.z);
-
-        m_transport.Send(request);
 
         m_world.remove<LocalAnimationComponent, LocalComponent>(aEntity);
     }
@@ -1477,16 +1710,21 @@ void CharacterService::RunLocalUpdates() const noexcept
 
     auto animatedLocalView = m_world.view<LocalComponent, LocalAnimationComponent, FormIdComponent>();
 
+    const bool ghosting = (m_world.GetSyncModeService().GetLocalMode() == SyncMode::Ghost);
     for (auto entity : animatedLocalView)
     {
         auto& localComponent = animatedLocalView.get<LocalComponent>(entity);
         auto& animationComponent = animatedLocalView.get<LocalAnimationComponent>(entity);
         auto& formIdComponent = animatedLocalView.get<FormIdComponent>(entity);
 
+        if (ghosting && formIdComponent.Id != 0x14)
+            continue;
+
         AnimationSystem::Serialize(m_world, message, localComponent, animationComponent, formIdComponent);
     }
 
-    m_transport.Send(message);
+    if (!message.Updates.empty())
+        m_transport.Send(message);
 }
 
 void CharacterService::RunRemoteUpdates() noexcept
@@ -1551,13 +1789,29 @@ void CharacterService::RunRemoteUpdates() noexcept
         auto& waitingFor3D = waitingView.get<WaitingFor3D>(entity);
 
         Actor* pActor = Cast<Actor>(TESForm::GetById(formIdComponent.Id));
-        if (!pActor || !pActor->GetNiNode())
+        if (!pActor)
+            continue;
+
+        ExtraContainerChanges::Data* pContainerChanges = pActor->GetContainerChanges();
+        if (!pActor->GetNiNode() || !pContainerChanges || !pContainerChanges->entries)
             continue;
 
         // By now, the actor has materialized in the world and is ready for further setup
 
-        pActor->SetActorInventory(waitingFor3D.SpawnRequest.InventoryContent);
-        pActor->SetFactions(waitingFor3D.SpawnRequest.FactionsContent);
+        const bool ghosting = (m_world.GetSyncModeService().GetLocalMode() == SyncMode::Ghost);
+        const bool remotePlayer = pActor->GetExtension() && pActor->GetExtension()->IsRemotePlayer();
+
+        if (ghosting && remotePlayer)
+        {
+            Inventory equipmentOnly = waitingFor3D.SpawnRequest.InventoryContent;
+            equipmentOnly.RemoveByFilter([](const Inventory::Entry& aEntry) { return !aEntry.IsWorn(); });
+            pActor->SetActorInventory(equipmentOnly);
+        }
+        else
+        {
+            pActor->SetActorInventory(waitingFor3D.SpawnRequest.InventoryContent);
+            pActor->SetFactions(waitingFor3D.SpawnRequest.FactionsContent);
+        }
 
         if (!waitingFor3D.SpawnRequest.ActionsToReplay.Actions.empty())
         {
@@ -1566,8 +1820,11 @@ void CharacterService::RunRemoteUpdates() noexcept
 
         m_weaponDrawUpdates[pActor->formID] = {waitingFor3D.SpawnRequest.IsWeaponDrawn};
 
-        if (pActor->IsDead() != waitingFor3D.SpawnRequest.IsDead)
-            waitingFor3D.SpawnRequest.IsDead ? pActor->Kill() : pActor->Respawn();
+        if (!(ghosting && remotePlayer))
+        {
+            if (pActor->IsDead() != waitingFor3D.SpawnRequest.IsDead)
+                waitingFor3D.SpawnRequest.IsDead ? pActor->Kill() : pActor->Respawn();
+        }
 
         if (pActor->IsVampireLord())
             pActor->FixVampireLordModel();
@@ -1579,6 +1836,49 @@ void CharacterService::RunRemoteUpdates() noexcept
 
     for (auto entity : toRemove)
         m_world.remove<WaitingFor3D>(entity);
+
+    auto pendingInventoryView = m_world.view<FormIdComponent, PendingInventoryComponent>();
+    Vector<entt::entity> pendingToRemove;
+
+    for (auto entity : pendingInventoryView)
+    {
+        auto& formIdComponent = pendingInventoryView.get<FormIdComponent>(entity);
+        auto& pendingInventory = pendingInventoryView.get<PendingInventoryComponent>(entity);
+
+        Actor* pActor = Cast<Actor>(TESForm::GetById(formIdComponent.Id));
+        if (!pActor)
+            continue;
+
+        ExtraContainerChanges::Data* pContainerChanges = pActor->GetContainerChanges();
+        if (!pActor->GetNiNode() || !pContainerChanges || !pContainerChanges->entries)
+            continue;
+
+        const bool ghosting = (m_world.GetSyncModeService().GetLocalMode() == SyncMode::Ghost);
+        const bool remotePlayer = pActor->GetExtension() && pActor->GetExtension()->IsRemotePlayer();
+
+        if (ghosting && remotePlayer)
+        {
+            Inventory equipmentOnly = pendingInventory.InventoryContent;
+            equipmentOnly.RemoveByFilter([](const Inventory::Entry& aEntry) { return !aEntry.IsWorn(); });
+            pActor->SetActorInventory(equipmentOnly);
+        }
+        else
+        {
+            pActor->SetActorInventory(pendingInventory.InventoryContent);
+
+            if (pActor->IsDead() != pendingInventory.IsDead)
+                pendingInventory.IsDead ? pActor->Kill() : pActor->Respawn();
+        }
+
+        m_weaponDrawUpdates[pActor->formID] = {pendingInventory.IsWeaponDrawn};
+
+        pendingToRemove.push_back(entity);
+
+        spdlog::info("Applied pending inventory for actor, form id: {:X}", pActor->formID);
+    }
+
+    for (auto entity : pendingToRemove)
+        m_world.remove<PendingInventoryComponent>(entity);
 }
 
 void CharacterService::RunFactionsUpdates() const noexcept

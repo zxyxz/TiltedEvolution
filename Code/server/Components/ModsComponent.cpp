@@ -34,8 +34,8 @@ uint32_t ModsComponent::AddLite(const String& acpFilename) noexcept
 
 void ModsComponent::AddServerMod(const ESLoader::PluginData& acData)
 {
-    // kind of a hack since we want to store both, so we take the two byte value
-    m_serverMods.emplace(acData.m_filename, Entry{acData.m_liteId, 1});
+    const uint32_t id = acData.m_isLite ? acData.m_liteId : acData.m_standardId;
+    m_serverMods.emplace(acData.m_filename, Entry{id, 1});
 }
 
 bool ModsComponent::IsInstalled(const String& acpFilename) const noexcept

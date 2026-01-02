@@ -1,7 +1,7 @@
 export interface Friend {
   id: number;
   name: string;
-  avatar: string;
+  avatar?: string;
   online: boolean;
 }
 
@@ -13,7 +13,7 @@ export class Player implements Friend {
   /** Username. */
   name: string;
 
-  avatar: string;
+  avatar?: string;
 
   /** Current health. */
   health?: number;
@@ -32,6 +32,9 @@ export class Player implements Friend {
 
   /** invitation sent. */
   hasBeenInvited: boolean;
+
+  /** Pending teleport request awaiting response. */
+  hasTeleportRequest: boolean;
 
   /** CellName */
   cellName: string;
@@ -55,11 +58,14 @@ export class Player implements Friend {
       cellName?: string;
       isLoaded?: boolean;
       isInLocalParty?: boolean;
+      hasTeleportRequest?: boolean;
     } = {},
   ) {
     this.id = options.id || 0;
     this.name = options.name || '';
-    this.avatar = options.avatar || '';
+    if (options.avatar) {
+      this.avatar = options.avatar;
+    }
     this.hasInvitedLocalPlayer = options.hasInvitedLocalPlayer || false;
     this.cellName = options.cellName || 'vide';
 
@@ -103,5 +109,6 @@ export class Player implements Friend {
     }
 
     this.isInLocalParty = options.isInLocalParty || false;
+    this.hasTeleportRequest = options.hasTeleportRequest || false;
   }
 }

@@ -15,7 +15,7 @@ class TESFile
 {
 public:
     TESFile() = default;
-    TESFile(TiltedPhoques::Map<String, uint8_t>& aMasterFiles);
+    TESFile(TiltedPhoques::Map<String, uint32_t>& aMasterFiles);
 
     void Setup(uint8_t aStandardId);
     void Setup(uint16_t aLiteId);
@@ -41,7 +41,7 @@ private:
     };
     uint32_t m_formIdPrefix = 0;
 
-    TiltedPhoques::Map<String, uint8_t>& m_masterFiles;
+    TiltedPhoques::Map<String, uint32_t>& m_masterFiles;
     TiltedPhoques::Map<uint8_t, uint32_t> m_parentToFormIdPrefix{};
 };
 

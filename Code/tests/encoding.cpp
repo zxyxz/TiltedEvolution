@@ -15,6 +15,10 @@
 
 #include <Messages/ClientMessageFactory.h>
 #include <Messages/ServerMessageFactory.h>
+#include <Messages/TeleportResponse.h>
+#include <Messages/NotifyTeleportRequest.h>
+#include <Messages/NotifyTeleportCountdown.h>
+#include <CredentialHash.h>
 #include <Structs/Vector2_NetQuantize.h>
 
 #include <TiltedCore/Math.hpp>
@@ -346,6 +350,8 @@ TEST_CASE("Packets", "[encoding.packets]")
         sendMessage.UserMods.ModList.push_back({"Hi", 14});
         sendMessage.UserMods.ModList.push_back({"Test", 8});
         sendMessage.UserMods.ModList.push_back({"Toast", 49});
+        sendMessage.Username = "TestUser";
+        sendMessage.Password = Credential::HashPassword("SuperSecret");
 
         Buffer::Writer writer(&buff);
         sendMessage.Serialize(writer);
@@ -378,6 +384,72 @@ TEST_CASE("Packets", "[encoding.packets]")
 
         uint64_t trash;
         reader.ReadBits(trash, 8); // pop opcode
+
+        recvMessage.DeserializeRaw(reader);
+
+        REQUIRE(sendMessage == recvMessage);
+    }
+
+    SECTION("TeleportResponse")
+    {
+        Buffer buff(100);
+
+        TeleportResponse sendMessage, recvMessage;
+        sendMessage.RequesterId = 77;
+        sendMessage.Accepted = true;
+
+        Buffer::Writer writer(&buff);
+        sendMessage.Serialize(writer);
+
+        Buffer::Reader reader(&buff);
+
+        uint64_t opcode;
+        reader.ReadBits(opcode, 8);
+
+        recvMessage.DeserializeRaw(reader);
+
+        REQUIRE(sendMessage == recvMessage);
+    }
+
+    SECTION("NotifyTeleportRequest")
+    {
+        Buffer buff(100);
+
+        NotifyTeleportRequest sendMessage, recvMessage;
+        sendMessage.RequesterId = 91;
+        sendMessage.RequesterName = "RequesterName";
+
+        Buffer::Writer writer(&buff);
+        sendMessage.Serialize(writer);
+
+        Buffer::Reader reader(&buff);
+
+        uint64_t opcode;
+        reader.ReadBits(opcode, 8);
+
+        recvMessage.DeserializeRaw(reader);
+
+        REQUIRE(sendMessage == recvMessage);
+    }
+
+    SECTION("NotifyTeleportCountdown")
+    {
+        Buffer buff(128);
+
+        NotifyTeleportCountdown sendMessage, recvMessage;
+        sendMessage.TargetPlayerId = 77;
+        sendMessage.TargetName = "Target";
+        sendMessage.DurationSeconds = 5;
+        sendMessage.Cancelled = true;
+        sendMessage.Reason = "Movement detected";
+
+        Buffer::Writer writer(&buff);
+        sendMessage.Serialize(writer);
+
+        Buffer::Reader reader(&buff);
+
+        uint64_t opcode;
+        reader.ReadBits(opcode, 8);
 
         recvMessage.DeserializeRaw(reader);
 
@@ -486,6 +558,7 @@ TEST_CASE("Packets", "[encoding.packets]")
 
         REQUIRE(recvMessage.Updates[1].UpdatedMovement == sendMessage.Updates[1].UpdatedMovement);
     }
+
 }
 
 TEST_CASE("StringCache", "[encoding.string_cache]")

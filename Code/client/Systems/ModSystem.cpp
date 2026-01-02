@@ -50,6 +50,13 @@ bool ModSystem::GetServerModId(uint32_t aGameId, GameId& aServerId) const noexce
 
 uint32_t ModSystem::GetGameId(uint32_t aServerId, uint32_t aFormId) const noexcept
 {
+    if (aServerId == std::numeric_limits<uint32_t>::max())
+    {
+        aFormId &= 0x00FFFFFFu;
+        aFormId |= 0xFF000000u;
+        return aFormId;
+    }
+
     auto itor = m_serverToGame.find(aServerId);
     if (itor != std::end(m_serverToGame))
     {

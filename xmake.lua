@@ -12,6 +12,8 @@ if is_plat("windows") then
     add_cxflags("/bigobj")
     add_syslinks("kernel32")
     set_arch("x64")
+    -- Force static runtime to match CEF library
+    set_runtimes(is_mode("debug") and "MTd" or "MT")
 end
 
 if is_plat("linux") then
@@ -30,24 +32,27 @@ if has_config("unitybuild") then
     add_rules("c++.unity_build", {batchsize = 12})
 end
 
--- direct dependencies version pinning 
+-- direct dependencies version pinning
 add_requires(
-    "entt v3.10.0", 
-    "recastnavigation v1.6.0", 
-    "tiltedcore v0.2.7", 
-    "cryptopp 8.9.0", 
-    "spdlog v1.13.0", 
+    "entt v3.10.0",
+    "recastnavigation v1.6.0",
+    "tiltedcore v0.2.7",
+    "cryptopp 8.9.0",
+    "spdlog v1.13.0",
     "cpp-httplib 0.14.0",
-    "gtest v1.14.0", 
-    "mem 1.0.0", 
-    "glm 0.9.9+8", 
-    "sentry-native 0.7.1", 
-    "zlib v1.3.1"
+    "gtest v1.14.0",
+    "mem 1.0.0",
+    "glm 0.9.9+8",
+    "sentry-native 0.7.1",
+    "zlib v1.3.1",
+    "fmt"
 )
 if is_plat("windows") then
     add_requires(
-        "discord 3.2.1", 
-        "imgui v1.89.7"
+        "discord 3.2.1",
+        "imgui v1.89.7",
+        "magnum",
+        "magnum-integration"
     )
 end
 
@@ -62,12 +67,13 @@ end
 
 add_requireconfs("cpp-httplib", {configs = {ssl = true}})
 add_requireconfs("sentry-native", { configs = { backend = "crashpad" } })
---[[
+add_requireconfs("imgui", { version = "v1.89.7", override = true })
+add_requireconfs("*.imgui", { version = "v1.89.7", override = true })
+add_requireconfs("magnum-integration.imgui", { version = "v1.89.7", override = true })
 add_requireconfs("magnum", { configs = { sdl2 = true }})
 add_requireconfs("magnum-integration",  { configs = { imgui = true }})
 add_requireconfs("magnum-integration.magnum",  { configs = { sdl2 = true }})
 add_requireconfs("magnum-integration.imgui", { override = true })
---]]
 
 before_build(function (target)
     import("modules.version")
@@ -78,9 +84,9 @@ before_build(function (target)
     #define IS_MASTER %d
     #define IS_BRANCH_BETA %d
     #define IS_BRANCH_PREREL %d
-    ]], 
-    bool_to_number[branch == "master"], 
-    bool_to_number[branch == "bluedove"], 
+    ]],
+    bool_to_number[branch == "master"],
+    bool_to_number[branch == "bluedove"],
     bool_to_number[branch == "prerel"])
 
     -- fix always-compiles problem by updating the file only if content has changed.
@@ -121,7 +127,7 @@ task("upload-symbols")
             config.load()
 
             local sentrybin = path.join(os.projectdir(), "build", "sentry-cli.exe")
-            if not os.exists(sentrybin) then 
+            if not os.exists(sentrybin) then
                 http.download("https://github.com/getsentry/sentry-cli/releases/download/2.0.2/sentry-cli-Windows-x86_64.exe", sentrybin)
             end
 

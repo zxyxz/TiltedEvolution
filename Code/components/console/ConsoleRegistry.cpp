@@ -101,6 +101,7 @@ void ConsoleRegistry::RegisterNatives()
             {
                 m_out->info("/{}:  {}", c->m_name, c->m_desc);
             }
+            m_out->info("Server chat: type a message without '/' to broadcast.");
             m_out->info("<------Variables-({})--->", m_settings.size());
             for (SettingBase* s : m_settings)
             {

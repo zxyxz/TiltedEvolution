@@ -5,6 +5,7 @@ void NotifyPlayerJoined::SerializeRaw(TiltedPhoques::Buffer::Writer& aWriter) co
 {
     Serialization::WriteVarInt(aWriter, PlayerId);
     Serialization::WriteString(aWriter, Username);
+    Serialization::WriteString(aWriter, Avatar);
     WorldSpaceId.Serialize(aWriter);
     CellId.Serialize(aWriter);
     Serialization::WriteVarInt(aWriter, Level);
@@ -16,6 +17,7 @@ void NotifyPlayerJoined::DeserializeRaw(TiltedPhoques::Buffer::Reader& aReader) 
 
     PlayerId = Serialization::ReadVarInt(aReader) & 0xFFFFFFFF;
     Username = Serialization::ReadString(aReader);
+    Avatar = Serialization::ReadString(aReader);
     WorldSpaceId.Deserialize(aReader);
     CellId.Deserialize(aReader);
     Level = Serialization::ReadVarInt(aReader) & 0xFFFF;

@@ -18,6 +18,7 @@
 #include <Messages/PartyCreateRequest.h>
 #include <Messages/PartyChangeLeaderRequest.h>
 #include <Messages/PartyKickRequest.h>
+#include <Messages/NotifyPlayerProfileImage.h>
 
 #include <OverlayApp.hpp>
 
@@ -35,6 +36,7 @@ PartyService::PartyService(World& aWorld, entt::dispatcher& aDispatcher, Transpo
     m_partyInviteConnection = aDispatcher.sink<NotifyPartyInvite>().connect<&PartyService::OnPartyInvite>(this);
     m_partyJoinedConnection = aDispatcher.sink<NotifyPartyJoined>().connect<&PartyService::OnPartyJoined>(this);
     m_partyLeftConnection = aDispatcher.sink<NotifyPartyLeft>().connect<&PartyService::OnPartyLeft>(this);
+    m_playerAvatarConnection = aDispatcher.sink<NotifyPlayerProfileImage>().connect<&PartyService::OnPlayerProfileImage>(this);
 }
 
 void PartyService::CreateParty() const noexcept
@@ -107,6 +109,12 @@ void PartyService::OnDisconnected(const DisconnectedEvent& acEvent) noexcept
 void PartyService::OnPlayerList(const NotifyPlayerList& acPlayerList) noexcept
 {
     m_players = acPlayerList.Players;
+}
+
+void PartyService::OnPlayerProfileImage(const NotifyPlayerProfileImage& acMessage) noexcept
+{
+    auto& entry = m_players[acMessage.PlayerId];
+    entry.Avatar = acMessage.Avatar;
 }
 
 void PartyService::OnPartyInfo(const NotifyPartyInfo& acPartyInfo) noexcept

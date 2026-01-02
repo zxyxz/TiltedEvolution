@@ -1,0 +1,10 @@
+<div
+  class="overlay-banner"
+  *ngIf="banner$ | async as banner"
+  [class.overlay-banner--error]="banner.tone === 'error'"
+>
+  <div class="overlay-banner__primary">{{ banner.primary }}</div>
+  <div *ngIf="banner.secondary" class="overlay-banner__secondary">
+    {{ banner.secondary }}
+  </div>
+</div>

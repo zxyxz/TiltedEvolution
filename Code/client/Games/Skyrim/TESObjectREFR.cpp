@@ -5,10 +5,14 @@
 
 #include <World.h>
 #include <Services/PapyrusService.h>
+#include <Services/SyncModeService.h>
+#include <Actor.h>
+#include <Forms/TESNPC.h>
 #include <Events/ActivateEvent.h>
 #include <Events/InventoryChangeEvent.h>
 #include <Events/ScriptAnimationEvent.h>
 #include <Events/LockChangeEvent.h>
+#include <Sync/DropExecutionContext.h>
 
 #include <ExtraData/ExtraDataList.h>
 #include <ExtraData/ExtraCharge.h>
@@ -45,6 +49,7 @@ TP_THIS_FUNCTION(TPlayAnimationAndWait, bool, void, uint32_t auiStackID, TESObje
 TP_THIS_FUNCTION(TPlayAnimation, bool, void, uint32_t auiStackID, TESObjectREFR* apSelf, BSFixedString* apEventName);
 TP_THIS_FUNCTION(TRotate, void, TESObjectREFR, float aAngle);
 TP_THIS_FUNCTION(TLockChange, void, TESObjectREFR);
+TP_THIS_FUNCTION(TApplyEffectShader, ShaderReferenceEffect*, TESObjectREFR, TESEffectShader* apEffectShader, float aDuration, TESObjectREFR* apFacingRef, bool aFaceTarget, bool aAttachToCamera, NiAVObject* apAttachNode, bool aInterfaceEffect);
 
 static TActivate* RealActivate = nullptr;
 static TAddInventoryItem* RealAddInventoryItem = nullptr;
@@ -135,11 +140,36 @@ uint32_t* TESObjectREFR::GetNullHandle() noexcept
     return s_nullHandle.Get();
 }
 
+ShaderReferenceEffect* TESObjectREFR::ApplyEffectShader(TESEffectShader* apEffectShader, float aDuration, TESObjectREFR* apFacingRef, bool aFaceTarget, bool aAttachToCamera, NiAVObject* apAttachNode, bool aInterfaceEffect)
+{
+    POINTER_SKYRIMSE(TApplyEffectShader, s_applyEffectShader, 19446);
+    return TiltedPhoques::ThisCall(s_applyEffectShader, this, apEffectShader, aDuration, apFacingRef, aFaceTarget, aAttachToCamera, apAttachNode, aInterfaceEffect);
+}
+
+void TESObjectREFR::SetPosition(const NiPoint3& acPosition) noexcept
+{
+    TP_THIS_FUNCTION(TSetPosition, void, TESObjectREFR, const NiPoint3&);
+    POINTER_SKYRIMSE(TSetPosition, s_setPosition, 19790);
+    TiltedPhoques::ThisCall(s_setPosition, this, acPosition);
+}
+
+void TESObjectREFR::SetAngle(const NiPoint3& acAngle) noexcept
+{
+    TP_THIS_FUNCTION(TSetAngle, void, TESObjectREFR, const NiPoint3&);
+    POINTER_SKYRIMSE(TSetAngle, s_setAngle, 19786);
+    TiltedPhoques::ThisCall(s_setAngle, this, acAngle);
+}
+
 void TESObjectREFR::SetRotation(float aX, float aY, float aZ) noexcept
 {
     TiltedPhoques::ThisCall(RealRotateX, this, aX);
     TiltedPhoques::ThisCall(RealRotateY, this, aY);
     TiltedPhoques::ThisCall(RealRotateZ, this, aZ);
+}
+
+void TESObjectREFR::SetRotation(const NiPoint3& acRotation) noexcept
+{
+    SetAngle(acRotation);
 }
 
 using TiltedPhoques::Serialization;
@@ -772,13 +802,48 @@ void TESObjectREFR::SetInventory(const Inventory& aInventory) noexcept
 
     ScopedInventoryOverride _;
 
-    RemoveAllItems();
+    Inventory currentInventory = GetInventory();
+    Inventory desiredInventory = aInventory;
 
-    for (const Inventory::Entry& entry : aInventory.Entries)
+    // Remove or adjust existing entries
+    for (auto& currentEntry : currentInventory.Entries)
+    {
+        auto matchIt = std::find_if(
+            desiredInventory.Entries.begin(), desiredInventory.Entries.end(),
+            [&currentEntry](const Inventory::Entry& entry) { return entry.BaseId == currentEntry.BaseId && entry.IsExtraDataEquals(currentEntry); });
+
+        const int32_t desiredCount = matchIt != desiredInventory.Entries.end() ? matchIt->Count : 0;
+        const int32_t diff = desiredCount - currentEntry.Count;
+
+        if (diff < 0)
+        {
+            Inventory::Entry removal = currentEntry;
+            removal.Count = diff; // negative count removes items
+            AddOrRemoveItem(removal, true);
+        }
+
+        if (matchIt != desiredInventory.Entries.end())
+        {
+            if (diff > 0)
+            {
+                Inventory::Entry addition = *matchIt;
+                addition.Count = diff;
+                AddOrRemoveItem(addition, true);
+            }
+
+            desiredInventory.Entries.erase(matchIt);
+        }
+    }
+
+    // Add any remaining desired entries that were not present before
+    for (auto& entry : desiredInventory.Entries)
     {
         if (entry.Count != 0)
             AddOrRemoveItem(entry, true);
     }
+
+    if (auto* pActor = Cast<Actor>(this))
+        pActor->SetMagicEquipment(aInventory.CurrentMagicEquipment);
 }
 
 Vector<uint32_t> TESObjectREFR::RemoveNonQuestItems(Inventory& aCurrentInventory) noexcept
@@ -829,6 +894,9 @@ void TESObjectREFR::SetInventoryRetainingQuestItems(Inventory& aCurrentInventory
                 AddOrRemoveItem(entry, true);
         }
     }
+
+    if (auto* pActor = Cast<Actor>(this))
+        pActor->SetMagicEquipment(acSourceInventory.CurrentMagicEquipment);
 }
 
 void TESObjectREFR::AddOrRemoveItem(const Inventory::Entry& arEntry, bool aIsSettingInventory) noexcept
@@ -980,11 +1048,25 @@ bool TP_MAKE_THISCALL(HookPlayAnimation, void, uint32_t auiStackID, TESObjectREF
 
 bool TP_MAKE_THISCALL(HookActivate, TESObjectREFR, TESObjectREFR* apActivator, uint8_t aUnk1, TESBoundObject* apObjectToGet, int32_t aCount, char aDefaultProcessing)
 {
+    // Ghosted remote player actors must be non-interactive.
+    if (auto* pTargetActor = Cast<Actor>(apThis))
+    {
+        const auto* pTargetEx = pTargetActor->GetExtension();
+        const bool isRemotePlayer = pTargetEx && pTargetEx->IsRemotePlayer();
+
+        const bool locallyGated = entt::locator<World>::has_value() && World::Get().GetSyncModeService().GetLocalMode() == SyncMode::Ghost;
+        const bool isGhostFlagged = pTargetActor->baseForm && pTargetActor->baseForm->formType == TESNPC::Type &&
+            (Cast<TESNPC>(pTargetActor->baseForm)->actorData.flags & (1u << 29));
+
+        if (isRemotePlayer && (locallyGated || isGhostFlagged))
+            return false;
+    }
+
     Actor* pActivator = Cast<Actor>(apActivator);
 
     // Exclude books from activation since only reading them removes them from the cell
     // Note: Books are now unsynced 
-    if (pActivator && apThis->baseForm->formType != FormType::Book)
+    if (pActivator && apThis->baseForm->formType != FormType::Book && entt::locator<World>::has_value())
     {
         auto openState = TESObjectREFR::kNone;
         if (apThis->baseForm->formType == FormType::Door)
@@ -1000,7 +1082,10 @@ bool TP_MAKE_THISCALL(HookActivate, TESObjectREFR, TESObjectREFR* apActivator, u
 
 void TP_MAKE_THISCALL(HookAddInventoryItem, TESObjectREFR, TESBoundObject* apItem, ExtraDataList* apExtraData, int32_t aCount, TESObjectREFR* apOldOwner)
 {
-    if (!ScopedInventoryOverride::IsOverriden())
+    const auto dropMode = DropExecution::GetCurrentMode();
+    const bool isPickupContext = dropMode == DropExecution::Mode::RemotePickup || dropMode == DropExecution::Mode::LocalPickup;
+
+    if (!ScopedInventoryOverride::IsOverriden() && !isPickupContext)
     {
         auto& modSystem = World::Get().GetModSystem();
 
@@ -1022,7 +1107,11 @@ void TP_MAKE_THISCALL(HookAddInventoryItem, TESObjectREFR, TESBoundObject* apIte
 BSPointerHandle<TESObjectREFR>*
 TP_MAKE_THISCALL(HookRemoveInventoryItem, TESObjectREFR, BSPointerHandle<TESObjectREFR>* apResult, TESBoundObject* apItem, int32_t aCount, ITEM_REMOVE_REASON aReason, ExtraDataList* apExtraList, TESObjectREFR* apMoveToRef, const NiPoint3* apDropLoc, const NiPoint3* apRotate)
 {
-    if (!ScopedInventoryOverride::IsOverriden())
+    const auto dropMode = DropExecution::GetCurrentMode();
+    const bool isSyncSuppressedContext =
+        dropMode == DropExecution::Mode::LocalDrop || dropMode == DropExecution::Mode::RemoteDrop || dropMode == DropExecution::Mode::RemotePickup || dropMode == DropExecution::Mode::LocalPickup;
+
+    if (!ScopedInventoryOverride::IsOverriden() && !isSyncSuppressedContext)
     {
         auto& modSystem = World::Get().GetModSystem();
 
@@ -1052,8 +1141,11 @@ void TP_MAKE_THISCALL(HookRotateX, TESObjectREFR, float aAngle)
     if (apThis->formType == Actor::Type)
     {
         const auto pActor = static_cast<Actor*>(apThis);
+        bool bAllowRemoteUpdate = ScopedReferencesOverride::IsOverriden();
+        if (!bAllowRemoteUpdate && pActor->GetExtension()->IsRemote())
+            bAllowRemoteUpdate = pActor->IsDead();
         // We don't allow remotes to move
-        if (pActor->GetExtension()->IsRemote())
+        if (pActor->GetExtension()->IsRemote() && !bAllowRemoteUpdate)
             return;
     }
 
@@ -1065,8 +1157,11 @@ void TP_MAKE_THISCALL(HookRotateY, TESObjectREFR, float aAngle)
     if (apThis->formType == Actor::Type)
     {
         const auto pActor = static_cast<Actor*>(apThis);
+        bool bAllowRemoteUpdate = ScopedReferencesOverride::IsOverriden();
+        if (!bAllowRemoteUpdate && pActor->GetExtension()->IsRemote())
+            bAllowRemoteUpdate = pActor->IsDead();
         // We don't allow remotes to move
-        if (pActor->GetExtension()->IsRemote())
+        if (pActor->GetExtension()->IsRemote() && !bAllowRemoteUpdate)
             return;
     }
 
@@ -1078,8 +1173,11 @@ void TP_MAKE_THISCALL(HookRotateZ, TESObjectREFR, float aAngle)
     if (apThis->formType == Actor::Type)
     {
         const auto pActor = static_cast<Actor*>(apThis);
+        bool bAllowRemoteUpdate = ScopedReferencesOverride::IsOverriden();
+        if (!bAllowRemoteUpdate && pActor->GetExtension()->IsRemote())
+            bAllowRemoteUpdate = pActor->IsDead();
         // We don't allow remotes to move
-        if (pActor->GetExtension()->IsRemote())
+        if (pActor->GetExtension()->IsRemote() && !bAllowRemoteUpdate)
             return;
     }
 

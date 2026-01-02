@@ -20,10 +20,14 @@
 #include <Messages/AuthenticationRequest.h>
 #include <Messages/ServerMessageFactory.h>
 #include <Messages/NotifySettingsChange.h>
+#include <CredentialHash.h>
 #include <Packet.hpp>
+#include <Opcodes.h>
 
 #include <ScriptExtender.h>
 #include <Services/DiscordService.h>
+#include <Services/SyncModeService.h>
+#include <fmt/format.h>
 
 // #include <imgui_internal.h>
 
@@ -78,6 +82,9 @@ bool TransportService::Send(const ClientMessage& acMessage) const noexcept
     {
         ScopedAllocator _{s_allocator};
 
+        if (!IsAllowedOutbound(acMessage))
+            return true; // Intentionally dropped in ghost mode; treat as success to avoid retries/log spam.
+
         Buffer buffer(1 << 16);
         Buffer::Writer writer(&buffer);
         writer.WriteBits(0, 8); // Write first byte as packet needs it
@@ -93,6 +100,15 @@ bool TransportService::Send(const ClientMessage& acMessage) const noexcept
     return false;
 }
 
+void TransportService::SetLoginCredentials(const std::string& acUsername, const std::string& acPassword) noexcept
+{
+    m_loginUsername = acUsername;
+    if (Credential::LooksLikePasswordHash(acPassword))
+        m_loginPassword = acPassword;
+    else
+        m_loginPassword = Credential::HashPassword(acPassword);
+}
+
 void TransportService::OnConsume(const void* apData, uint32_t aSize)
 {
     ServerMessageFactory factory;
@@ -105,6 +121,9 @@ void TransportService::OnConsume(const void* apData, uint32_t aSize)
         spdlog::error("Couldn't parse packet from server");
         return;
     }
+
+    if (!IsAllowedInbound(*pMessage))
+        return;
 
     m_messageHandlers[pMessage->GetOpcode()](pMessage);
 }
@@ -125,7 +144,11 @@ void TransportService::OnConnected()
     // TODO: think about user opt out
     request.DiscordId = m_world.ctx().at<DiscordService>().GetUser().id;
     auto* pNpc = Cast<TESNPC>(pPlayer->baseForm);
-    if (pNpc)
+    if (!m_loginUsername.empty())
+    {
+        request.Username = m_loginUsername;
+    }
+    else if (pNpc)
     {
         request.Username = pNpc->fullName.value.AsAscii();
     }
@@ -133,6 +156,8 @@ void TransportService::OnConnected()
     {
         request.Username = "Some dragon boi";
     }
+    request.Password = m_loginPassword;
+    m_loginPassword.clear();
 
     auto* const cpModManager = ModManager::Get();
 
@@ -247,9 +272,19 @@ void TransportService::HandleAuthenticationResponse(const AuthenticationResponse
         ErrorInfo += "]}";
         break;
     }
-    case AR::kWrongPassword:
+    case AR::kWrongAccountPassword:
     {
-        ErrorInfo += "\"error\": \"wrong_password\"";
+        ErrorInfo += "\"error\": \"wrong_account_password\"";
+        break;
+    }
+    case AR::kWrongServerPassword:
+    {
+        ErrorInfo += "\"error\": \"wrong_server_password\"";
+        break;
+    }
+    case AR::kDuplicateUser:
+    {
+        ErrorInfo += "\"error\": \"duplicate_user\"";
         break;
     }
     case AR::kServerFull:
@@ -276,4 +311,96 @@ void TransportService::HandleNotifySettingsChange(const NotifySettingsChange& ac
 {
     m_world.SetServerSettings(acMessage.Settings);
     m_dispatcher.trigger(acMessage.Settings);
+}
+
+bool TransportService::IsAllowedOutbound(const ClientMessage& acMessage) const noexcept
+{
+    // Only filter once we are connected and ghosting
+    if (!m_connected || m_world.GetSyncModeService().GetLocalMode() != SyncMode::Ghost)
+        return true;
+
+    const auto opcode = static_cast<ClientOpcode>(acMessage.GetOpcode());
+    switch (opcode)
+    {
+    // Minimal presence + movement for the local player while ghosting
+    case kAssignCharacterRequest:
+    case kClientReferencesMoveRequest:
+    case kShiftGridCellRequest:
+    case kEnterExteriorCellRequest:
+    case kEnterInteriorCellRequest:
+        return true;
+    // Cosmetic-only: keep remote ghost visuals correct while quest-gated
+    case kRequestEquipmentChanges:
+    case kPlayEmoteRequest:
+    case kCancelEmoteRequest:
+        return true;
+    // Keep sync mode negotiation working
+    case kRequestSetSyncMode:
+        return true;
+    // Party management + chat while quest-gated
+    case kPartyInviteRequest:
+    case kPartyAcceptInviteRequest:
+    case kPartyLeaveRequest:
+    case kPartyCreateRequest:
+    case kPartyChangeLeaderRequest:
+    case kPartyKickRequest:
+    case kSendChatMessageRequest:
+    // Trade while quest-gated (no world sync)
+    case kTradeInviteRequest:
+    case kTradeInviteResponseRequest:
+    case kTradeOfferUpdateRequest:
+    case kTradeSetReadyRequest:
+    case kTradeCancelRequest:
+        return true;
+    default: break;
+    }
+
+    return false;
+}
+
+bool TransportService::IsAllowedInbound(const ServerMessage& acMessage) const noexcept
+{
+    if (!m_connected || m_world.GetSyncModeService().GetLocalMode() != SyncMode::Ghost)
+        return true;
+
+    const auto opcode = static_cast<ServerOpcode>(acMessage.GetOpcode());
+    switch (opcode)
+    {
+    // Handshake / presence only
+    case kAuthenticationResponse:
+    case kAssignCharacterResponse:
+    case kServerTimeSettings:
+    case kNotifyPlayerList:
+    case kNotifyPlayerJoined:
+    case kNotifyPlayerLeft:
+    case kNotifyPlayerSyncMode:
+    case kStringCacheUpdate:
+    case kNotifyCommandList:
+    case kNotifyPartyInfo:
+    case kNotifyPartyInvite:
+    case kNotifyPartyJoined:
+    case kNotifyPartyLeft:
+    case kNotifyChatMessageBroadcast:
+    case kNotifyTradeInvite:
+    case kNotifyTradeStarted:
+    case kNotifyTradeState:
+    case kNotifyTradeCancel:
+    case kNotifyTradeComplete:
+        return true;
+
+    // Bare minimum to render remote players
+    case kCharacterSpawnRequest:
+    case kNotifySpawnData:
+    case kNotifyRemoveCharacter:
+    case kServerReferencesMoveRequest:
+    // Cosmetic-only: keep remote ghost visuals correct while quest-gated
+    case kNotifyEquipmentChanges:
+    case kNotifyPlayEmote:
+    case kNotifyCancelEmote:
+        return true;
+
+    default: break;
+    }
+
+    return false;
 }

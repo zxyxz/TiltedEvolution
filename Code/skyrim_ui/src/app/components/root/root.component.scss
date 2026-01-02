@@ -4,6 +4,8 @@
 @import 'functions/mod';
 @import 'functions/rem';
 
+$-color-primary: #8ac8ff;
+
 :host {
   display: block;
 
@@ -85,6 +87,12 @@
       min-width: 40vw;
     }
 
+    > app-popup[data-popup='emotes'] > app-window {
+      max-width: 70vw;
+      min-width: 48vw;
+      overflow: visible;
+    }
+
     > app-popup[data-popup='playerManager'] > app-window {
       max-width: 30vw;
       min-width: 25vw;
@@ -130,9 +138,40 @@
     margin: 0.1rem;
     flex: 1 1 auto;
   }
+
+  .emote-quick-button {
+    align-self: flex-end;
+    margin: rem(16, 12) rem(16, 8) rem(16, 4) 0;
+    display: inline-flex;
+    align-items: center;
+    gap: rem(16, 8);
+    padding: rem(16, 10) rem(16, 14);
+    border-radius: rem(16, 14);
+    border: 1px solid mod($-color-background, 0.4);
+    background: linear-gradient(
+      120deg,
+      mod($-color-background, 0.1),
+      mod($-color-background, 0.25)
+    );
+    color: mod($-color-primary, 0.05);
+    box-shadow: 0 rem(16, 6) rem(16, 14) rgba(0, 0, 0, 0.35);
+
+    .hotkey-tag {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 rem(16, 8);
+      height: rem(16, 22);
+      border-radius: 999px;
+      background: mod($-color-background, 0.35);
+      border: 1px solid mod($-color-background, 0.3);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+  }
 }
 
-// Note: due to how `-webkit-background-clip` renders clipped text (that's needed for 
+// Note: due to how `-webkit-background-clip` renders clipped text (that's needed for
 // the cooldown effect), we need to apply a few workarounds to make it look just right. I'm sorry!
 
 .cooldown-supporting-text-normal {
@@ -147,8 +186,8 @@
 .text-cooldown-effect {
   --cooldown-duration: 10s;
   background: linear-gradient(
-    to left, 
-    mod($-color-background, 0.3) 50%, 
+    to left,
+    mod($-color-background, 0.3) 50%,
     mod($-color-background, 1) 50%
   );
   background-clip: text;

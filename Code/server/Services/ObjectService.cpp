@@ -124,9 +124,18 @@ void ObjectService::OnActivate(const PacketEvent<ActivateRequest>& acMessage) co
     notifyActivate.ActivatorId = acMessage.Packet.ActivatorId;
     notifyActivate.PreActivationOpenState = acMessage.Packet.PreActivationOpenState;
 
+    TiltedPhoques::Vector<ConnectionId_t> players;
+    players.reserve(m_world.GetPlayerManager().Count());
+
     for (auto pPlayer : m_world.GetPlayerManager())
     {
-        if (pPlayer != acMessage.pPlayer && pPlayer->GetCellComponent().Cell == acMessage.Packet.CellId)
+        players.push_back(pPlayer->GetConnectionId());
+    }
+
+    for (auto connectionId : players)
+    {
+        auto pPlayer = m_world.GetPlayerManager().GetByConnectionId(connectionId);
+        if (pPlayer && pPlayer != acMessage.pPlayer && pPlayer->GetCellComponent().Cell == acMessage.Packet.CellId)
         {
             pPlayer->Send(notifyActivate);
         }
@@ -157,8 +166,20 @@ void ObjectService::OnLockChange(const PacketEvent<LockChangeRequest>& acMessage
         objectComponent.CurrentLockData.LockLevel = acMessage.Packet.LockLevel;
     }
 
+    TiltedPhoques::Vector<ConnectionId_t> players;
+    players.reserve(m_world.GetPlayerManager().Count());
+
     for (Player* pPlayer : m_world.GetPlayerManager())
     {
+        players.push_back(pPlayer->GetConnectionId());
+    }
+
+    for (auto connectionId : players)
+    {
+        Player* pPlayer = m_world.GetPlayerManager().GetByConnectionId(connectionId);
+        if (!pPlayer)
+            continue;
+
         if (pPlayer == acMessage.pPlayer)
             continue;
 
@@ -176,8 +197,17 @@ void ObjectService::OnScriptAnimationRequest(const PacketEvent<ScriptAnimationRe
     message.Animation = packet.Animation;
     message.EventName = packet.EventName;
 
+    TiltedPhoques::Vector<ConnectionId_t> players;
+    players.reserve(m_world.GetPlayerManager().Count());
+
     for (Player* pPlayer : m_world.GetPlayerManager())
     {
-        pPlayer->Send(message);
+        players.push_back(pPlayer->GetConnectionId());
+    }
+
+    for (auto connectionId : players)
+    {
+        if (Player* pPlayer = m_world.GetPlayerManager().GetByConnectionId(connectionId))
+            pPlayer->Send(message);
     }
 }

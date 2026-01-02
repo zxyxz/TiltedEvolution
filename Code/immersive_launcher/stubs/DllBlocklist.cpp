@@ -48,7 +48,7 @@ const DllGreyEntry kDllGreyList[] =
     {
         L"EngineFixes.dll", 
         L"Data\\SKSE\\Plugins\\EngineFixes.toml",
-        "^VerboseLogging\\s*=",         // Matches EngineFixes Release 6.x series.
+        "(^|\\r?\\n)\\s*VerboseLogging\\s*=",         // Matches EngineFixes Release 6.x series.
         "# SKYRIM TOGETHER REBORN marker for EngineFixes required compatibility settings v2, DO NOT CHANGE THIS LINE",
 
         L"For EngineFixes to work with Skyrim Together Reborn, some settings are required:\n"
@@ -81,7 +81,7 @@ const DllGreyEntry kDllGreyList[] =
     {
         L"EngineFixes.dll", 
         L"Data\\SKSE\\Plugins\\EngineFixes.toml",
-        "^bVerboseLogging\\s*=",        // Matches EngineFixes Release 7.x series.
+        "(^|\\r?\\n)\\s*bVerboseLogging\\s*=",        // Matches EngineFixes Release 7.x series.
         "",                             // No sig regex
         L"",                            // No prompt
         "",                             // No sig to insert

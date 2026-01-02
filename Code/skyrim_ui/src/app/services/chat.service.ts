@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { ReplaySubject } from 'rxjs';
 import { environment } from 'src/environments/environment';
-import { Command, CommandHandler } from './chat/commands';
+import { CommandHandler } from './chat/commands';
 
 export enum MessageTypes {
   SYSTEM_MESSAGE = 0,
@@ -9,6 +9,7 @@ export enum MessageTypes {
   PLAYER_DIALOGUE = 2,
   PARTY_CHAT = 3,
   LOCAL_CHAT = 4,
+  WHISPER = 5,
 }
 
 export interface ChatMessage {
@@ -23,6 +24,7 @@ export interface ChatMessage {
 })
 export class ChatService {
   public messageList = new ReplaySubject<ChatMessage>();
+  public serverCommands: SkyrimTogetherTypes.CommandListEntry[] = [];
 
   /**
    * Send chat message to the Server. Does not add anything to the local mesesage list.
@@ -40,8 +42,9 @@ export class ChatService {
     }
 
     if (content.startsWith(this.CommandHandler.COMMAND_PREFIX)) {
-      this.CommandHandler.tryExecute(content);
-      return;
+      if (this.CommandHandler.tryExecute(content)) {
+        return;
+      }
     }
 
     skyrimtogether.sendMessage(type, content);
@@ -78,27 +81,23 @@ export class ChatService {
 
   private CommandHandler: CommandHandler;
 
-  private LocalChat: Command = {
-    name: 'local',
-    executor: async args => {
-      const content = args.join(' ');
-      this.sendMessage(MessageTypes.LOCAL_CHAT, content);
-    },
-  };
-
-  private PartyChat: Command = {
-    name: 'party',
-    executor: async args => {
-      const content = args.join(' ');
-      this.sendMessage(MessageTypes.PARTY_CHAT, content);
-    },
-  };
+  private onCommandListReceived(commandsJson: string): void {
+    try {
+      const parsed = JSON.parse(
+        commandsJson,
+      ) as SkyrimTogetherTypes.CommandListEntry[];
+      if (Array.isArray(parsed)) {
+        this.serverCommands = parsed;
+      }
+    } catch {
+      this.serverCommands = [];
+    }
+  }
 
   constructor() {
     skyrimtogether.on('message', this.onMessageRecieved.bind(this));
+    skyrimtogether.on('commandList', this.onCommandListReceived.bind(this));
 
     this.CommandHandler = new CommandHandler(this);
-    this.CommandHandler.register(this.LocalChat);
-    this.CommandHandler.register(this.PartyChat);
   }
 }

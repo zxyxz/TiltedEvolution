@@ -2,6 +2,8 @@
 #include "GameServer.h"
 
 #include <common/GameServerInstance.h>
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/base_sink.h>
 
 #ifdef _WIN32
 #define GS_EXPORT __declspec(dllexport)
@@ -12,6 +14,39 @@
 namespace
 {
 constexpr char kBuildTag[]{BUILD_BRANCH "@" BUILD_COMMIT};
+
+using UiLogCallback = void (*)(const char*);
+UiLogCallback s_uiLogCallback = nullptr;
+
+class UiCallbackSink : public spdlog::sinks::base_sink<std::mutex>
+{
+public:
+    explicit UiCallbackSink(UiLogCallback aCallback)
+        : m_callback(aCallback)
+    {
+        set_pattern("[%l] %v");
+        set_level(spdlog::level::trace);
+    }
+
+protected:
+    void sink_it_(const spdlog::details::log_msg& msg) override
+    {
+        if (!m_callback)
+            return;
+
+        spdlog::memory_buf_t formatted;
+        formatter_->format(msg, formatted);
+
+        m_callback(fmt::to_string(formatted).c_str());
+    }
+
+    void flush_() override {}
+
+private:
+    UiLogCallback m_callback;
+};
+
+spdlog::sink_ptr s_uiSink;
 } // namespace
 
 struct GameServerInstance final : IGameServerInstance
@@ -30,6 +65,8 @@ struct GameServerInstance final : IGameServerInstance
     bool IsListening() override;
     bool IsRunning() override;
     void Update() override;
+    Console::ConsoleRegistry::ExecutionResult ExecuteConsoleCommand(const TiltedPhoques::String& aCommand) override;
+    void GetStatus(ServerStatusSnapshot& aOutStatus) const override;
 
 private:
     GameServer m_gameServer;
@@ -60,6 +97,17 @@ void GameServerInstance::Update()
 {
     m_gameServer.Update();
 }
+
+Console::ConsoleRegistry::ExecutionResult GameServerInstance::ExecuteConsoleCommand(const TiltedPhoques::String& aCommand)
+{
+    return m_gameServer.ExecuteConsoleCommand(aCommand);
+}
+
+void GameServerInstance::GetStatus(ServerStatusSnapshot& aOutStatus) const
+{
+    m_gameServer.GetStatusSnapshot(aOutStatus);
+}
+
 
 // NOTE(Vince): For now we use this to compare the dll to the server.
 GS_EXPORT const char* GetBuildTag()
@@ -104,6 +152,24 @@ GS_EXPORT void RegisterLogger(std::shared_ptr<spdlog::logger> aLogger)
     //  yes this needs to be here, else the dedirunner dies
     spdlog::register_logger(std::move(aLogger));
     // #endif
+}
+
+GS_EXPORT void SetUiLogCallback(void (*aCallback)(const char*))
+{
+    s_uiLogCallback = aCallback;
+    if (!s_uiLogCallback)
+        return;
+
+    if (!s_uiSink)
+        s_uiSink = std::static_pointer_cast<spdlog::sinks::sink>(std::make_shared<UiCallbackSink>(s_uiLogCallback));
+
+    spdlog::apply_all([](const std::shared_ptr<spdlog::logger>& logger)
+    {
+        if (!logger)
+            return;
+        logger->flush_on(logger->level());
+        logger->sinks().push_back(s_uiSink);
+    });
 }
 
 #ifdef _WIN32

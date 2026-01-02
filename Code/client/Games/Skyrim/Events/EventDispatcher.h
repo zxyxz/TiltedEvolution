@@ -18,7 +18,11 @@ template <class T> struct EventDispatcher
 
     void UnRegisterSink(BSTEventSink<T>* apSink) noexcept { details::InternalUnRegisterSink(reinterpret_cast<void*>(this), reinterpret_cast<void*>(apSink)); }
 
-    void PushEvent(const T* apEvent) noexcept { details::InternalPushEvent(reinterpret_cast<void*>(this), reinterpret_cast<void*>(apEvent)); }
+    void PushEvent(const T* apEvent) noexcept
+    {
+        // Engine dispatch expects a non-const event pointer; we only read from it on the engine side.
+        details::InternalPushEvent(reinterpret_cast<void*>(this), const_cast<void*>(reinterpret_cast<const void*>(apEvent)));
+    }
 
     uint8_t pad0[0x58];
 };
@@ -100,6 +104,9 @@ struct TESFurnitureEvent
 
 struct TESGrabReleaseEvent
 {
+    TESObjectREFR* reference;
+    bool grabbed;
+    uint8_t pad9[7]{};
 };
 
 struct TESHitEvent

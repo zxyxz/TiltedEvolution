@@ -50,7 +50,13 @@ void CombatService::OnProjectileLaunchRequest(const PacketEvent<ProjectileLaunch
     notify.UnkBool1 = packet.UnkBool1;
     notify.UnkBool2 = packet.UnkBool2;
 
-    const auto cShooterEntity = static_cast<entt::entity>(packet.ShooterID);
-    if (!GameServer::Get()->SendToPlayersInRange(notify, cShooterEntity, acMessage.GetSender()))
+    const auto entity = m_world.TryResolveEntity(packet.ShooterID);
+    if (!entity)
+    {
+        spdlog::debug("Projectile launch from unknown entity {:X}", packet.ShooterID);
+        return;
+    }
+
+    if (!GameServer::Get()->SendToPlayersInRange(notify, *entity, acMessage.GetSender()))
         spdlog::error("{}: SendToPlayersInRange failed", __FUNCTION__);
 }

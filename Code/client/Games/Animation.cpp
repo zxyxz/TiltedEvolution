@@ -19,6 +19,7 @@ static TPerformAction* RealPerformAction;
 
 // TODO: make scoped override
 thread_local bool g_forceAnimation = false;
+thread_local bool g_forceAnimationNetwork = false;
 
 uint8_t TP_MAKE_THISCALL(HookPerformAction, ActorMediator, TESActionData* apAction)
 {
@@ -43,7 +44,7 @@ uint8_t TP_MAKE_THISCALL(HookPerformAction, ActorMediator, TESActionData* apActi
         // spdlog::debug("Action event name: {}, target name: {}", apAction->eventName.AsAscii(), apAction->targetEventName.AsAscii());
 
         // This is a weird case where it gets spammed and doesn't do much, not sure if it still needs to be sent over the network
-        if (apAction->someFlag == 1 || g_forceAnimation)
+        if (apAction->someFlag == 1 || (g_forceAnimation && !g_forceAnimationNetwork))
             return res;
 
         action.EventName = apAction->eventName.AsAscii();

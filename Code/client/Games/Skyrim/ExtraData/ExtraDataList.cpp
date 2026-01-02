@@ -2,6 +2,8 @@
 
 #include <Games/Overrides.h>
 
+BSExtraData::~BSExtraData() = default;
+
 ExtraDataList* ExtraDataList::New() noexcept
 {
     ExtraDataList* pExtraDataList = Memory::Allocate<ExtraDataList>();
@@ -66,6 +68,27 @@ bool ExtraDataList::Add(ExtraDataType aType, BSExtraData* apNewData)
     return true;
 }
 
+bool ExtraDataList::Remove(ExtraDataType aType, BSExtraData* apData)
+{
+    BSScopedLock<BSRecursiveLock> _(lock);
+
+    BSExtraData** ppEntry = &data;
+    while (*ppEntry)
+    {
+        if ((*ppEntry)->GetType() == aType && (!apData || *ppEntry == apData))
+        {
+            BSExtraData* pToRemove = *ppEntry;
+            *ppEntry = pToRemove->next;
+            SetType(aType, true);
+            return true;
+        }
+
+        ppEntry = &((*ppEntry)->next);
+    }
+
+    return false;
+}
+
 uint32_t ExtraDataList::GetCount() const
 {
     uint32_t count = 0;
@@ -96,6 +119,13 @@ void ExtraDataList::SetSoulData(SOUL_LEVEL aSoulLevel) noexcept
     TP_THIS_FUNCTION(TSetSoulData, void, ExtraDataList, SOUL_LEVEL aSoulLevel);
     POINTER_SKYRIMSE(TSetSoulData, setSoulData, 11620);
     TiltedPhoques::ThisCall(setSoulData, this, aSoulLevel);
+}
+
+void ExtraDataList::SetCount(uint16_t aCount) noexcept
+{
+    TP_THIS_FUNCTION(TSetCount, void, ExtraDataList, uint16_t aCount);
+    POINTER_SKYRIMSE(TSetCount, setCount, 11617);
+    TiltedPhoques::ThisCall(setCount, this, aCount);
 }
 
 void ExtraDataList::SetChargeData(float aCharge) noexcept

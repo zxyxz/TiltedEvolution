@@ -21,6 +21,7 @@
 #include <Forms/TESObjectCELL.h>
 #include <Forms/TESWorldSpace.h>
 #include <Forms/BGSEncounterZone.h>
+#include <Sync/DropManager.h>
 
 #include <inttypes.h>
 
@@ -238,17 +239,54 @@ void ObjectService::OnActivate(const ActivateEvent& acEvent) noexcept
         return;
     }
 
+    bool hasCellId = false;
     TESObjectCELL* pCell = acEvent.pObject->GetParentCellEx();
-    if (!pCell)
+    if (pCell)
     {
-        spdlog::error("Activated object has no parent cell: {:X}", acEvent.pObject->formID);
-        return;
+        hasCellId = m_world.GetModSystem().GetServerModId(pCell->formID, request.CellId);
+        if (!hasCellId)
+        {
+            spdlog::error("Server cell id not found for cell form id {:X}", pCell->formID);
+            return;
+        }
     }
-
-    if (!m_world.GetModSystem().GetServerModId(pCell->formID, request.CellId))
+    else
     {
-        spdlog::error("Server cell id not found for cell form id {:X}", acEvent.pObject->parentCell->formID);
-        return;
+        const auto resolveFromDrop = [&](uint64_t aDropId) {
+            if (auto dropData = DropManager::GetServerDrop(aDropId))
+            {
+                request.CellId = dropData->CellId;
+                return request.CellId.ModId != 0 || request.CellId.BaseId != 0;
+            }
+            return false;
+        };
+
+        if (auto handle = acEvent.pObject->GetHandle(); handle && handle.handle.iBits)
+        {
+            if (auto dropId = DropManager::GetDropIdForHandle(handle.handle.iBits))
+                hasCellId = resolveFromDrop(*dropId);
+        }
+
+        if (!hasCellId)
+        {
+            GameId objectId{};
+            World::Get().GetModSystem().GetServerModId(acEvent.pObject->baseForm->formID, objectId);
+            if (objectId.ModId || objectId.BaseId)
+            {
+                if (auto dropId = DropManager::FindDropBySignature(objectId, acEvent.pObject->position, 200.0f * 200.0f))
+                {
+                    hasCellId = resolveFromDrop(*dropId);
+                    if (hasCellId)
+                        spdlog::debug("ObjectService: resolved cell from drop {} for object {:X}", *dropId, acEvent.pObject->formID);
+                }
+            }
+        }
+
+        if (!hasCellId)
+        {
+            spdlog::error("Activated object has no parent cell: {:X}", acEvent.pObject->formID);
+            return;
+        }
     }
 
     auto view = m_world.view<FormIdComponent>();

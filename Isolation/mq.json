@@ -1,0 +1,101 @@
+{
+    "docs": [
+        "Drop quest gating files in this Isolation folder. Each JSON file can contain any number of rule objects.",
+        "Only the fields below are parsed: quest.idName, blacklist[].stageMin, blacklist[].stageMax.",
+        "All other fields (name, notes, docs) are ignored by the parser but can be used for documentation.",
+        "Stage ranges are inclusive; hitting any matching range forces the client into GhostOnly mode."
+    ],
+    "rules": [
+        {
+            "name": "Unbound",
+            "quest": {
+                "idName": "MQ101"
+            },
+            "blacklist": [
+                {
+                    "stageMin": 0,
+                    "stageMax": 900,
+                    "notes": "Helgen intro: cart ride, execution, keep selection, forced movement and controls."
+                }
+            ]
+        },
+        {
+            "name": "Diplomatic Immunity",
+            "quest": {
+                "idName": "MQ201"
+            },
+            "blacklist": [
+                {
+                    "stageMin": 100,
+                    "stageMax": 230,
+                    "notes": "Embassy party, equipment confiscation, smuggling logic, torture chamber recovery, inventory restoration."
+                }
+            ]
+        },
+        {
+            "name": "Diplomatic Immunity - Recover Equipment Misc",
+            "quest": {
+                "idName": "MQ201RecoverGearMISC"
+            },
+            "blacklist": [
+                {
+                    "stageMin": 0,
+                    "stageMax": 100,
+                    "notes": "Standalone misc quest handling all equipment recovery logic."
+                }
+            ]
+        },
+        {
+            "name": "Alduins Bane",
+            "quest": {
+                "idName": "MQ206"
+            },
+            "blacklist": [
+                {
+                    "stageMin": 10,
+                    "stageMax": 100,
+                    "notes": "Time-Wound vision and Dragonrend acquisition cutscene with forced camera and player disable."
+                }
+            ]
+        },
+        {
+            "name": "Season Unending",
+            "quest": {
+                "idName": "MQ302"
+            },
+            "blacklist": [
+                {
+                    "stageMin": 10,
+                    "stageMax": 300,
+                    "notes": "Peace council scene, forced seating, dialogue-driven civil war state resolution."
+                }
+            ]
+        },
+        {
+            "name": "The Fallen",
+            "quest": {
+                "idName": "MQ301"
+            },
+            "blacklist": [
+                {
+                    "stageMin": 30,
+                    "stageMax": 220,
+                    "notes": "Odahviing trap scene and dragon riding transition to Skuldafn."
+                }
+            ]
+        },
+        {
+            "name": "Sovngarde",
+            "quest": {
+                "idName": "MQ304"
+            },
+            "blacklist": [
+                {
+                    "stageMin": 0,
+                    "stageMax": 150,
+                    "notes": "Portal entry, mist soul-snare logic, hero gating, Hall of Valor scene scripting."
+                }
+            ]
+        }
+    ]
+}

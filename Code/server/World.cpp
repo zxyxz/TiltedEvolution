@@ -6,23 +6,28 @@
 #include <Services/QuestService.h>
 #include <Services/ServerListService.h>
 #include <Services/ActorValueService.h>
-#include <Services/AdminService.h>
 #include <Services/InventoryService.h>
+#include <Services/DropService.h>
 #include <Services/MagicService.h>
+#include <Services/AdminService.h>
+#include <Services/ChatCommandService.h>
 #include <Services/OverlayService.h>
 #include <Services/CommandService.h>
 #include <Services/StringCacheService.h>
 #include <Services/CombatService.h>
+#include <Services/TradeService.h>
 #include <Services/WeatherService.h>
 #include <Services/ScriptService.h>
 #include <Services/MapService.h>
+#include <Services/VoteTimeService.h>
+#include <Services/LoginService.h>
+#include <Services/SyncModeService.h>
+#include <Services/PlayerLocationService.h>
 
 #include <es_loader/ESLoader.h>
 
 World::World()
 {
-    m_spAdminService = std::make_shared<AdminService>(*this, m_dispatcher);
-    spdlog::default_logger()->sinks().push_back(std::static_pointer_cast<spdlog::sinks::sink>(m_spAdminService));
 
     ctx().emplace<CharacterService>(*this, m_dispatcher);
     ctx().emplace<PlayerService>(*this, m_dispatcher);
@@ -32,15 +37,23 @@ World::World()
     ctx().emplace<ServerListService>(*this, m_dispatcher);
     ctx().emplace<QuestService>(*this, m_dispatcher);
     ctx().emplace<PartyService>(*this, m_dispatcher);
+    ctx().emplace<SyncModeService>(*this, m_dispatcher);
     ctx().emplace<ActorValueService>(*this, m_dispatcher);
     ctx().emplace<InventoryService>(*this, m_dispatcher);
+    ctx().emplace<DropService>(*this, m_dispatcher);
     ctx().emplace<MagicService>(*this, m_dispatcher);
+    ctx().emplace<AdminService>(*this, m_dispatcher);
+    ctx().emplace<ChatCommandService>(*this, m_dispatcher);
+    ctx().emplace<PlayerLocationService>(*this, m_dispatcher);
     ctx().emplace<OverlayService>(*this, m_dispatcher);
     ctx().emplace<CommandService>(*this, m_dispatcher);
     ctx().emplace<StringCacheService>(*this, m_dispatcher);
+    ctx().emplace<TradeService>(*this, m_dispatcher);
     ctx().emplace<CombatService>(*this, m_dispatcher);
     ctx().emplace<WeatherService>(*this, m_dispatcher);
     ctx().emplace<MapService>(*this, m_dispatcher);
+    ctx().emplace<VoteTimeService>(*this, m_dispatcher);
+    ctx().emplace<LoginService>(*this, m_dispatcher);
 
     ESLoader::ESLoader loader;
     // emplace loaded mods into modscomponent.
@@ -57,4 +70,24 @@ World::World()
 World::~World()
 {
     m_pScriptService.reset();
+}
+
+std::optional<entt::entity> World::TryResolveEntity(uint32_t aServerId) noexcept
+{
+    const auto entity = static_cast<entt::entity>(aServerId);
+
+    if (!valid(entity))
+        return std::nullopt;
+
+    return entity;
+}
+
+std::optional<entt::entity> World::TryResolveEntity(uint32_t aServerId) const noexcept
+{
+    const auto entity = static_cast<entt::entity>(aServerId);
+
+    if (!valid(entity))
+        return std::nullopt;
+
+    return entity;
 }

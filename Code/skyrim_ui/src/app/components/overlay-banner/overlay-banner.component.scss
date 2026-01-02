@@ -1,0 +1,29 @@
+.overlay-banner {
+  position: absolute;
+  top: 42%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+  color: #f8f5e1;
+  text-shadow: 0 0 12px rgba(0, 0, 0, 0.7);
+  font-size: 2.2rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 0.25rem 0.5rem;
+  z-index: 12;
+
+  &__primary {
+    white-space: pre-line;
+  }
+
+  &__secondary {
+    font-size: 1.4rem;
+    margin-top: 0.35rem;
+    opacity: 0.9;
+  }
+
+  &--error {
+    color: #ff8b8b;
+  }
+}

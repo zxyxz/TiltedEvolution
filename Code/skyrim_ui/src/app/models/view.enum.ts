@@ -6,4 +6,6 @@ export enum View {
   SERVER_LIST,
   SETTINGS,
   PLAYER_MANAGER,
+  TRADE,
+  EMOTES,
 }

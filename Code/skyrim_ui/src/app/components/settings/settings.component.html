@@ -4,7 +4,9 @@
       <h2>{{ 'COMPONENT.SETTINGS.VERSION.HEADER' | transloco }}</h2>
       <div class="flex-item">
         {{ 'COMPONENT.SETTINGS.VERSION.INFO' | transloco }}
-        <div class="version" [class.outdated]="isVersionOutdated | async">{{ clientVersion$ | async }}</div>
+        <div class="version" [class.outdated]="isVersionOutdated | async">
+          {{ clientVersion$ | async }}
+        </div>
       </div>
       <div *ngIf="isVersionOutdated | async" class="flex-item">
         {{ 'COMPONENT.SETTINGS.VERSION.OUTDATED' | transloco }}
@@ -68,6 +70,20 @@
             *ngFor="let size of availableFontSizes"
             [text]="size.label"
             [value]="size.id"
+          ></app-dropdown-option>
+        </app-dropdown>
+      </div>
+      <div class="setting">
+        <label>{{ 'COMPONENT.SETTINGS.NAMETAG_MODE' | transloco }}</label>
+        <app-dropdown
+          class="settings-dropdown"
+          [ngModel]="settings.nametagMode | async"
+          (ngModelChange)="settings.nametagMode.next($event)"
+        >
+          <app-dropdown-option
+            *ngFor="let mode of availableNametagModes"
+            [text]="mode.label"
+            [value]="mode.id"
           ></app-dropdown-option>
         </app-dropdown>
       </div>

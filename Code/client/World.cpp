@@ -13,19 +13,29 @@
 #include <Services/QuestService.h>
 #include <Services/ActorValueService.h>
 #include <Services/InventoryService.h>
+#include <Services/Generic/DropService.h>
+#include <Services/Generic/CoSaveService.h>
 #include <Services/MagicService.h>
 #include <Services/CommandService.h>
+#include <Services/TradeService.h>
 #include <Services/CalendarService.h>
 #include <Services/StringCacheService.h>
 #include <Services/PlayerService.h>
 #include <Services/CombatService.h>
 #include <Services/WeatherService.h>
 #include <Services/MapService.h>
+#include <Services/PartyMarkerOverlayService.h>
+#include <Services/PartyMapOverlayService.h>
+#include <Services/BrandingService.h>
+#include <Services/NameTagService.h>
+#include <Services/SyncModeService.h>
+
+
 
 #include <Events/PreUpdateEvent.h>
 #include <Events/UpdateEvent.h>
 
-#include <ModCompat/BehaviorVar.h>  
+#include <ModCompat/BehaviorVar.h>
 
 World::World()
     : m_runner(m_dispatcher)
@@ -37,16 +47,21 @@ World::World()
     ctx().emplace<DiscoveryService>(*this, m_dispatcher);
     ctx().emplace<OverlayService>(*this, m_transport, m_dispatcher);
     ctx().emplace<InputService>(ctx().at<OverlayService>());
+    // Quest gating needs to observe ConnectedEvent before gameplay replication starts.
+    ctx().emplace<QuestService>(*this, m_dispatcher);
+    ctx().emplace<SyncModeService>(*this, m_dispatcher, m_transport);
     ctx().emplace<CharacterService>(*this, m_dispatcher, m_transport);
     ctx().emplace<DebugService>(m_dispatcher, *this, m_transport, ctx().at<ImguiService>());
     ctx().emplace<PapyrusService>(m_dispatcher);
     ctx().emplace<DiscordService>(m_dispatcher);
     ctx().emplace<ObjectService>(*this, m_dispatcher, m_transport);
     ctx().emplace<CalendarService>(*this, m_dispatcher, m_transport);
-    ctx().emplace<QuestService>(*this, m_dispatcher);
     ctx().emplace<PartyService>(*this, m_dispatcher, m_transport);
+    ctx().emplace<TradeService>(*this, m_dispatcher, m_transport);
     ctx().emplace<ActorValueService>(*this, m_dispatcher, m_transport);
     ctx().emplace<InventoryService>(*this, m_dispatcher, m_transport);
+    ctx().emplace<CoSaveService>(*this, m_dispatcher, m_transport);
+    ctx().emplace<DropService>(*this, m_dispatcher, m_transport);
     ctx().emplace<MagicService>(*this, m_dispatcher, m_transport);
     ctx().emplace<CommandService>(*this, m_transport, m_dispatcher);
     ctx().emplace<PlayerService>(*this, m_dispatcher, m_transport);
@@ -54,6 +69,10 @@ World::World()
     ctx().emplace<CombatService>(*this, m_transport, m_dispatcher);
     ctx().emplace<WeatherService>(*this, m_transport, m_dispatcher);
     ctx().emplace<MapService>(*this, m_dispatcher, m_transport);
+    ctx().emplace<PartyMarkerOverlayService>(*this, m_dispatcher);
+    ctx().emplace<PartyMapOverlayService>(*this, m_dispatcher);
+    ctx().emplace<BrandingService>(*this, m_dispatcher);
+    ctx().emplace<NameTagService>(*this, m_dispatcher);
 
     BehaviorVar::Get()->Init();
 }

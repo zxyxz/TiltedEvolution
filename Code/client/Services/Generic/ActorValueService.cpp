@@ -20,6 +20,7 @@
 #include <Messages/RequestHealthChangeBroadcast.h>
 #include <Messages/NotifyDeathStateChange.h>
 #include <Messages/RequestDeathStateChange.h>
+#include <Services/SyncModeService.h>
 
 #include <misc/ActorValueOwner.h>
 
@@ -310,6 +311,9 @@ void ActorValueService::OnHealthChangeBroadcast(const NotifyHealthChangeBroadcas
 
 void ActorValueService::OnActorValueChanges(const NotifyActorValueChanges& acMessage) const noexcept
 {
+    if (m_world.GetSyncModeService().GetLocalMode() == SyncMode::Ghost)
+        return;
+
     auto view = m_world.view<FormIdComponent, RemoteComponent>();
 
     const auto itor = std::find_if(std::begin(view), std::end(view), [id = acMessage.Id, view](entt::entity entity) { return view.get<RemoteComponent>(entity).Id == id; });
@@ -342,6 +346,9 @@ void ActorValueService::OnActorValueChanges(const NotifyActorValueChanges& acMes
 
 void ActorValueService::OnActorMaxValueChanges(const NotifyActorMaxValueChanges& acMessage) const noexcept
 {
+    if (m_world.GetSyncModeService().GetLocalMode() == SyncMode::Ghost)
+        return;
+
     auto view = m_world.view<FormIdComponent, RemoteComponent>();
 
     const auto it = std::find_if(std::begin(view), std::end(view), [id = acMessage.Id, view](entt::entity entity) { return view.get<RemoteComponent>(entity).Id == id; });

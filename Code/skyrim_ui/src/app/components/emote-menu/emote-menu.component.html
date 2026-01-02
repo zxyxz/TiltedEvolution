@@ -1,0 +1,82 @@
+<div class="emote-menu">
+  <header class="emote-menu__header">
+    <div class="eyebrow">
+      {{ 'COMPONENT.EMOTE_MENU.EYEBROW' | transloco }}
+    </div>
+    <h2>{{ 'COMPONENT.EMOTE_MENU.TITLE' | transloco }}</h2>
+    <p class="subtitle">
+      {{ 'COMPONENT.EMOTE_MENU.SUBTITLE' | transloco }}
+    </p>
+    <div class="emote-filters">
+      <button
+        type="button"
+        *ngFor="let cat of categories()"
+        class="emote-filter"
+        [attr.data-active]="activeCategory === cat"
+        (click)="setCategory(cat)"
+      >
+        {{ 'COMPONENT.EMOTE_MENU.FILTERS.' + cat.toUpperCase() | transloco }}
+      </button>
+    </div>
+  </header>
+
+  <div class="emote-wheel">
+    <div class="emote-wheel__ring"></div>
+    <div class="emote-wheel__center">
+      <ng-container *ngIf="hoveredEmote; else defaultHint">
+        <div class="emote-wheel__current-title">
+          {{
+            'COMPONENT.EMOTE_MENU.EMOTES.' + hoveredEmote.key + '.TITLE'
+              | transloco
+          }}
+        </div>
+        <div class="emote-wheel__current-desc">
+          {{
+            'COMPONENT.EMOTE_MENU.EMOTES.' + hoveredEmote.key + '.DESC'
+              | transloco
+          }}
+        </div>
+      </ng-container>
+      <ng-template #defaultHint>
+        <div class="emote-wheel__hint">
+          {{ 'COMPONENT.EMOTE_MENU.HINT' | transloco }}
+        </div>
+        <div class="emote-wheel__key">B</div>
+      </ng-template>
+    </div>
+
+    <ng-container *ngIf="filteredList.length; else noResults">
+      <button
+        *ngFor="let emote of filteredList; index as i; trackBy: emoteTrackBy"
+        type="button"
+        class="emote-wheel__slice"
+        [style.--i]="i"
+        [style.--total]="filteredList.length"
+        [attr.data-tone]="emote.tone"
+        (click)="play(emote)"
+        (mouseenter)="hover(emote)"
+        (mouseleave)="hover(undefined)"
+      >
+        <span class="emote-wheel__label">
+          {{
+            'COMPONENT.EMOTE_MENU.EMOTES.' + emote.key + '.TITLE' | transloco
+          }}
+        </span>
+        <span class="emote-wheel__desc">
+          {{ 'COMPONENT.EMOTE_MENU.EMOTES.' + emote.key + '.DESC' | transloco }}
+        </span>
+      </button>
+    </ng-container>
+    <ng-template #noResults>
+      <div class="emote-wheel__empty">
+        {{ 'COMPONENT.EMOTE_MENU.NO_RESULTS' | transloco }}
+      </div>
+    </ng-template>
+  </div>
+
+  <app-action-buttons>
+    <button data-style="ghost" (click)="done.next()">
+      {{ 'COMPONENT.EMOTE_MENU.CLOSE' | transloco }}
+    </button>
+  </app-action-buttons>
+</div>

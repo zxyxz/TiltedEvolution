@@ -24,6 +24,7 @@ import { UiRepository } from '../../store/ui.repository';
 })
 export class ConnectComponent implements OnDestroy, AfterViewInit {
   public address = '';
+  public username = '';
   public password = '';
   public savePassword = false;
 
@@ -74,8 +75,17 @@ export class ConnectComponent implements OnDestroy, AfterViewInit {
       });
 
     this.address = this.storeService.get('last_connected_address', '');
-    this.password = this.storeService.get('last_connected_password', '');
-    this.savePassword = this.password !== '';
+    const savedUsername = this.storeService.get('last_connected_username', '');
+    const savedPassword = this.storeService.get('last_connected_password', '');
+    if (savedUsername) {
+      this.username = savedUsername;
+    }
+    if (savedPassword) {
+      this.password = savedPassword;
+    }
+    this.savePassword =
+      (!!savedUsername && savedUsername.length > 0) ||
+      (!!savedPassword && savedPassword.length > 0);
   }
 
   public ngAfterViewInit(): void {
@@ -105,18 +115,42 @@ export class ConnectComponent implements OnDestroy, AfterViewInit {
 
     this.connecting = true;
 
+    const username = this.username.trim();
+
+    if (username.length === 0) {
+      this.sound.play(Sound.Fail);
+      const message = await firstValueFrom(
+        this.translocoService.selectTranslate(
+          'COMPONENT.CONNECT.ERROR.INVALID_USERNAME',
+        ),
+      );
+      await this.errorService.setError(message);
+      return;
+    }
+
+    this.username = username;
+
     this.storeService.set('last_connected_address', this.address);
     if (this.savePassword) {
+      this.storeService.set('last_connected_username', username);
       this.storeService.set('last_connected_password', this.password);
     } else {
+      this.storeService.remove('last_connected_username');
       this.storeService.remove('last_connected_password');
     }
+
+    const port = address[2] ? Number.parseInt(address[2], 10) : 10578;
+    const savedEntry = this.getSavedServerEntry(address[1], port);
+    const serverPassword =
+      savedEntry?.serverPassword ?? savedEntry?.password ?? '';
 
     this.sound.play(Sound.Ok);
     this.client.connect(
       address[1],
-      address[2] ? Number.parseInt(address[2]) : 10578,
+      port,
+      username,
       this.password,
+      serverPassword,
     );
   }
 
@@ -147,5 +181,38 @@ export class ConnectComponent implements OnDestroy, AfterViewInit {
 
     event.stopPropagation();
     event.preventDefault();
+  }
+
+  private getSavedServerEntry(
+    ip: string,
+    port: number,
+  ):
+    | {
+        ip: string;
+        port: number;
+        username?: string;
+        accountPassword?: string;
+        serverPassword?: string;
+        password?: string;
+      }
+    | undefined {
+    const savedServerList = JSON.parse(
+      this.storeService.get('savedServerList', '[]'),
+    );
+    const savedServer = savedServerList.find(
+      (saved: any) => saved.ip === ip && saved.port === port,
+    );
+
+    if (savedServer) {
+      if (
+        savedServer.password &&
+        (!savedServer.serverPassword || savedServer.serverPassword.length === 0)
+      ) {
+        savedServer.serverPassword = savedServer.password;
+      }
+      return savedServer;
+    }
+
+    return undefined;
   }
 }

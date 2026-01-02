@@ -1,29 +1,33 @@
 #pragma once
 
-#include <Events/AdminPacketEvent.h>
-#include <spdlog/sinks/base_sink.h>
+#include <TiltedCore/Stl.hpp>
 
+#include <filesystem>
+
+#include <entt/fwd.hpp>
+
+struct sqlite3;
 struct World;
-struct UpdateEvent;
-struct AdminShutdownRequest;
 
-/**
- * @brief Handles communication from an admin client.
- *
- * This service is currently not in use.
- */
-class AdminService : public spdlog::sinks::base_sink<spdlog::details::null_mutex>
+struct AdminService
 {
-public:
-    AdminService(World& aWorld, entt::dispatcher& aDispatcher);
+    AdminService(World& aWorld, entt::dispatcher& aDispatcher) noexcept;
+    ~AdminService() noexcept;
+
+    TP_NOCOPYMOVE(AdminService);
+
+    bool IsAdmin(const TiltedPhoques::String& aUsername) const noexcept;
+    bool AddAdmin(const TiltedPhoques::String& aUsername) noexcept;
+    bool RemoveAdmin(const TiltedPhoques::String& aUsername) noexcept;
+    void GetAdmins(TiltedPhoques::Vector<TiltedPhoques::String>& aOutAdmins) const noexcept;
 
 private:
-    void HandleShutdown(const AdminPacketEvent<AdminShutdownRequest>& aChanges) noexcept;
+    static TiltedPhoques::String NormalizeUsername(const TiltedPhoques::String& aUsername);
+    std::filesystem::path ResolveAdminDatabasePath() const noexcept;
+    bool InitializeDatabase() noexcept;
+    void ShutdownDatabase() noexcept;
 
-    void sink_it_(const spdlog::details::log_msg& msg) override;
-    void flush_() override;
-
-    Vector<String> m_messages;
-    entt::scoped_connection m_shutdownConnection;
     World& m_world;
+    sqlite3* m_pDatabase{nullptr};
+    std::filesystem::path m_databasePath;
 };

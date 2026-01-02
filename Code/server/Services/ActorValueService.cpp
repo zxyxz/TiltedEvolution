@@ -24,9 +24,16 @@ void ActorValueService::OnActorValueChanges(const PacketEvent<RequestActorValueC
 {
     auto& message = acMessage.Packet;
 
+    const auto entity = m_world.TryResolveEntity(message.Id);
+    if (!entity)
+    {
+        spdlog::debug("Actor value change requested for unknown entity {:X}", message.Id);
+        return;
+    }
+
     auto actorValuesView = m_world.view<ActorValuesComponent, OwnerComponent>();
 
-    auto it = actorValuesView.find(static_cast<entt::entity>(message.Id));
+    auto it = actorValuesView.find(*entity);
 
     if (it != actorValuesView.end())
     {
@@ -41,8 +48,7 @@ void ActorValueService::OnActorValueChanges(const PacketEvent<RequestActorValueC
     notify.Id = acMessage.Packet.Id;
     notify.Values = acMessage.Packet.Values;
 
-    const entt::entity cEntity = static_cast<entt::entity>(message.Id);
-    if (!GameServer::Get()->SendToPlayersInRange(notify, cEntity, acMessage.pPlayer))
+    if (!GameServer::Get()->SendToPlayersInRange(notify, *entity, acMessage.pPlayer))
         spdlog::error("{}: SendToPlayersInRange failed", __FUNCTION__);
 }
 
@@ -50,9 +56,16 @@ void ActorValueService::OnActorMaxValueChanges(const PacketEvent<RequestActorMax
 {
     auto& message = acMessage.Packet;
 
+    const auto entity = m_world.TryResolveEntity(message.Id);
+    if (!entity)
+    {
+        spdlog::debug("Actor max value change requested for unknown entity {:X}", message.Id);
+        return;
+    }
+
     auto actorValuesView = m_world.view<ActorValuesComponent, OwnerComponent>();
 
-    auto it = actorValuesView.find(static_cast<entt::entity>(message.Id));
+    auto it = actorValuesView.find(*entity);
 
     if (it != actorValuesView.end())
     {
@@ -67,8 +80,7 @@ void ActorValueService::OnActorMaxValueChanges(const PacketEvent<RequestActorMax
     notify.Id = message.Id;
     notify.Values = message.Values;
 
-    const entt::entity cEntity = static_cast<entt::entity>(message.Id);
-    if (!GameServer::Get()->SendToPlayersInRange(notify, cEntity, acMessage.pPlayer))
+    if (!GameServer::Get()->SendToPlayersInRange(notify, *entity, acMessage.pPlayer))
         spdlog::error("{}: SendToPlayersInRange failed", __FUNCTION__);
 }
 
@@ -76,10 +88,17 @@ void ActorValueService::OnHealthChangeBroadcast(const PacketEvent<RequestHealthC
 {
     auto& message = acMessage.Packet;
 
+    const auto entity = m_world.TryResolveEntity(message.Id);
+    if (!entity)
+    {
+        spdlog::debug("Health change broadcast requested for unknown entity {:X}", message.Id);
+        return;
+    }
+
     // TODO(cosideci): should server side health not be updated?
     auto actorValuesView = m_world.view<ActorValuesComponent, OwnerComponent>();
 
-    auto it = actorValuesView.find(static_cast<entt::entity>(message.Id));
+    auto it = actorValuesView.find(*entity);
 
     if (it != actorValuesView.end())
     {
@@ -89,11 +108,10 @@ void ActorValueService::OnHealthChangeBroadcast(const PacketEvent<RequestHealthC
     }
 
     NotifyHealthChangeBroadcast notify;
-    notify.Id = message.Id;
+   notify.Id = message.Id;
     notify.DeltaHealth = message.DeltaHealth;
 
-    const entt::entity cEntity = static_cast<entt::entity>(message.Id);
-    if (!GameServer::Get()->SendToPlayersInRange(notify, cEntity, acMessage.pPlayer))
+    if (!GameServer::Get()->SendToPlayersInRange(notify, *entity, acMessage.pPlayer))
         spdlog::error("{}: SendToPlayersInRange failed", __FUNCTION__);
 }
 
@@ -101,9 +119,16 @@ void ActorValueService::OnDeathStateChange(const PacketEvent<RequestDeathStateCh
 {
     auto& message = acMessage.Packet;
 
+    const auto entity = m_world.TryResolveEntity(message.Id);
+    if (!entity)
+    {
+        spdlog::debug("Death state change requested for unknown entity {:X}", message.Id);
+        return;
+    }
+
     auto characterView = m_world.view<CharacterComponent, OwnerComponent>();
 
-    const auto it = characterView.find(static_cast<entt::entity>(message.Id));
+    const auto it = characterView.find(*entity);
 
     if (it != characterView.end())
     {
@@ -116,7 +141,6 @@ void ActorValueService::OnDeathStateChange(const PacketEvent<RequestDeathStateCh
     notify.Id = message.Id;
     notify.IsDead = message.IsDead;
 
-    const entt::entity cEntity = static_cast<entt::entity>(message.Id);
-    if (!GameServer::Get()->SendToPlayersInRange(notify, cEntity, acMessage.pPlayer))
+    if (!GameServer::Get()->SendToPlayersInRange(notify, *entity, acMessage.pPlayer))
         spdlog::error("{}: SendToPlayersInRange failed", __FUNCTION__);
 }

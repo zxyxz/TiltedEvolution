@@ -36,6 +36,9 @@ struct RecordCollection
     WRLD& GetWorldById(uint32_t aFormId) noexcept { return m_worlds[aFormId]; }
     NAVM& GetNavMeshById(uint32_t aFormId) noexcept { return m_navMeshes[aFormId]; }
 
+    // Accessors to iterate over records (read-only)
+    const Map<uint32_t, WRLD>& GetWorlds() const noexcept { return m_worlds; }
+
     void BuildReferences();
 
 private:

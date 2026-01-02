@@ -38,6 +38,9 @@ function messageTypeToClassName(type: MessageTypes): string {
     case MessageTypes.LOCAL_CHAT:
       return 'local';
 
+    case MessageTypes.WHISPER:
+      return 'whisper';
+
     default:
       return 'global';
   }

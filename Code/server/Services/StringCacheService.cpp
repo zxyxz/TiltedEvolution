@@ -27,8 +27,20 @@ void StringCacheService::HandleUpdate(const UpdateEvent&) const noexcept
     if (!stringCache.ProcessDirty())
         return;
 
+    TiltedPhoques::Vector<ConnectionId_t> players;
+    players.reserve(m_world.GetPlayerManager().Count());
+
     for (const auto pPlayer : m_world.GetPlayerManager())
     {
+        players.push_back(pPlayer->GetConnectionId());
+    }
+
+    for (auto connectionId : players)
+    {
+        auto pPlayer = m_world.GetPlayerManager().GetByConnectionId(connectionId);
+        if (!pPlayer)
+            continue;
+
         auto startId = pPlayer->GetStringCacheId();
         auto update = stringCache.Serialize(startId);
         pPlayer->SetStringCacheId(startId);

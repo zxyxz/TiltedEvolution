@@ -2,6 +2,7 @@
 
 struct World;
 struct TransportService;
+struct PlayerCharacter;
 
 struct UpdateEvent;
 struct ConnectedEvent;
@@ -26,6 +27,12 @@ struct PlayerService
 
     TP_NOCOPYMOVE(PlayerService);
 
+    // Called from UI (CEF) when the player presses the respawn button.
+    void RequestManualRespawn() noexcept;
+
+    // Called when a party member revives the local player with a healing spell.
+    void OnHealRevive() noexcept;
+
 protected:
     void OnUpdate(const UpdateEvent& acEvent) noexcept;
     void OnConnected(const ConnectedEvent& acEvent) noexcept;
@@ -41,7 +48,7 @@ protected:
 
 private:
     /**
-     * @brief Run the respawn timer, and if it hits 0, respawn the player.
+     * @brief Run the respawn timer and drive death screen updates.
      */
     void RunRespawnUpdates(const double acDeltaTime) noexcept;
     void RunPostDeathUpdates(const double acDeltaTime) noexcept;
@@ -51,6 +58,7 @@ private:
     void RunDifficultyUpdates() const noexcept;
     void RunLevelUpdates() const noexcept;
     void RunBeastFormDetection() const noexcept;
+    void SyncCachedEquipment(PlayerCharacter* apPlayer) noexcept;
 
     void ToggleDeathSystem(bool aSet) noexcept;
 
@@ -64,14 +72,26 @@ private:
 
     bool m_isDeathSystemEnabled = true;
 
+    // True while the player is in bleedout and the death screen is active.
+    bool m_waitingForRespawn = false;
+    // Becomes true when the cooldown has finished and the respawn button can be pressed.
+    bool m_canRespawn = false;
+    // Set by button click/heal to trigger respawn from RunRespawnUpdates
+    bool m_shouldRespawnAtEntrance = false;
+    bool m_shouldRespawnInPlace = false;
+
     bool m_knockdownStart = false;
     double m_knockdownTimer = 0.0;
 
     bool m_godmodeStart = false;
     double m_godmodeTimer = 0.0;
 
-    uint32_t m_cachedMainSpellId = 0;
-    uint32_t m_cachedSecondarySpellId = 0;
+    uint32_t m_cachedLeftHandSpellId = 0;
+    uint32_t m_cachedRightHandSpellId = 0;
+    uint32_t m_cachedLeftHandItemId = 0;
+    uint32_t m_cachedRightHandItemId = 0;
+    uint32_t m_cachedTwoHandedItemId = 0;
+    uint32_t m_cachedAmmoId = 0;
     uint32_t m_cachedPowerId = 0;
 
     entt::scoped_connection m_updateConnection;

@@ -15,7 +15,8 @@ public:
     std::optional<Chunks::WCTR> m_centerCell;
     std::optional<uint32_t> m_climateId;
     std::optional<Chunks::DNAM> m_landData;
-    std::optional<uint32_t> m_parentId;
+    std::optional<uint32_t> m_parentId;   // WNAM: Parent worldspace formID
+    std::optional<Chunks::ONAM> m_onam;    // ONAM: Map marker relation to parent (scale + cell offsets)
     uint32_t m_musicId;
     float m_lodMultiplier;
 

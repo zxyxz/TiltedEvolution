@@ -5,6 +5,7 @@
 
 #include <atomic>
 #include <Client.hpp>
+#include <Structs/SyncMode.h>
 
 struct ImguiService;
 struct UpdateEvent;
@@ -13,6 +14,7 @@ struct AuthenticationResponse;
 struct NotifySettingsChange;
 
 struct World;
+struct SyncModeService;
 
 using TiltedPhoques::Client;
 
@@ -35,6 +37,8 @@ struct TransportService : Client
 
     [[nodiscard]] bool IsOnline() const noexcept { return m_connected; }
     void SetServerPassword(const std::string& acPassword) noexcept { m_serverPassword = acPassword; }
+    void SetLoginCredentials(const std::string& acUsername, const std::string& acPassword) noexcept;
+    [[nodiscard]] std::string GetLoginUsername() const noexcept { return m_loginUsername.c_str(); }
     const uint32_t& GetLocalPlayerId() const noexcept { return m_localPlayerId; }
 
 protected:
@@ -48,10 +52,15 @@ protected:
     void HandleNotifySettingsChange(const NotifySettingsChange& acMessage) noexcept;
 
 private:
+    bool IsAllowedOutbound(const ClientMessage& acMessage) const noexcept;
+    bool IsAllowedInbound(const ServerMessage& acMessage) const noexcept;
+
     World& m_world;
     entt::dispatcher& m_dispatcher;
     bool m_connected;
     String m_serverPassword{};
+    String m_loginUsername{};
+    String m_loginPassword{};
     uint32_t m_localPlayerId;
 
     entt::scoped_connection m_updateConnection;

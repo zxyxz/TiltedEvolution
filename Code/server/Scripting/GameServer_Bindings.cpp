@@ -19,7 +19,7 @@ void CreateGameServerBindings(sol::state_view aState)
 
         std::regex escapeHtml{"<[^>]+>\\s+(?=<)|<[^>]+>"};
         notifyMessage.MessageType = ChatMessageType::kLocalChat;
-        notifyMessage.PlayerName = "[Server]";
+        notifyMessage.PlayerName = "";
         notifyMessage.ChatMessage = std::regex_replace(acMessage, escapeHtml, "");
         GameServer::Get()->Send(aConnectionId, notifyMessage);
     };
@@ -28,7 +28,7 @@ void CreateGameServerBindings(sol::state_view aState)
 
         std::regex escapeHtml{"<[^>]+>\\s+(?=<)|<[^>]+>"};
         notifyMessage.MessageType = ChatMessageType::kGlobalChat;
-        notifyMessage.PlayerName = "[Server]";
+        notifyMessage.PlayerName = "";
         notifyMessage.ChatMessage = std::regex_replace(acMessage, escapeHtml, "");
         GameServer::Get()->SendToPlayers(notifyMessage);
     };

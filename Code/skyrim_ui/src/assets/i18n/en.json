@@ -13,6 +13,9 @@
         "HELGEN": "Do NOT connect to any server if you are still in the Helgen intro sequence. Make sure you just escaped Helgen first."
       },
       "ADDRESS": "Address",
+      "USERNAME": "Username",
+      "ACCOUNT_PASSWORD": "Account password",
+      "SERVER_PASSWORD": "Server password",
       "PASSWORD": "Password",
       "SAVE_PASSWORD": "Save Password?",
       "HIDE_PASSWORD": "Hide Password?",
@@ -22,7 +25,8 @@
       "ERROR": {
         "CONNECTION": "Could not connect to the specified server. Please make sure you've entered the correct address and that you're not experiencing network issues",
         "VERSION_MISMATCH": "You cannot connect to the server because it does not have the same version of Skyrim Together as you.",
-        "INVALID_ADDRESS": "The address is of invalid format."
+        "INVALID_ADDRESS": "The address is of invalid format.",
+        "INVALID_USERNAME": "Please provide a username to continue."
       }
     },
     "DISCONNECT": {
@@ -36,7 +40,8 @@
     "NOTIFICATIONS": {
       "MESSAGE_FROM": "Message from",
       "ACCEPT": "Accept",
-      "DECLINE": "Decline"
+      "DECLINE": "Decline",
+      "CANCEL": "Cancel"
     },
     "PARTY_MENU": {
       "ACCEPT_INVITE": "Accept invite from {{name}}",
@@ -59,10 +64,22 @@
       },
       "ACTIONS": {
         "KICK": "Kick",
-        "TELEPORT": "Teleport",
+        "ASK_TELEPORT": "Ask to teleport",
+        "ACCEPT_TELEPORT": "Accept teleport",
+        "DENY_TELEPORT": "Deny teleport",
         "MAKE_LEADER": "Make leader"
       },
-      "LEAVE_PARTY": "Leave party"
+      "LEAVE_PARTY": "Leave party",
+      "PROFILE_PICTURE": {
+        "TITLE": "Profile picture",
+        "DESCRIPTION": "Shown to your party and on the world map.",
+        "UPLOAD": "Upload image",
+        "REMOVE": "Remove image",
+        "SIZE_LIMIT": "PNG or JPG, auto-resized to 128x128 (max 256 KB).",
+        "ERROR_SIZE": "Image is too large (max 256 KB).",
+        "ERROR_TYPE": "Unsupported file type. Please use PNG or JPG.",
+        "ERROR_PROCESS": "Couldn't process that image. Please try another PNG or JPG."
+      }
     },
     "PARTY_LIST": {
       "NO_OTHER_PLAYERS": "Nobody here but us chickens",
@@ -71,7 +88,54 @@
         "NAME": "Name",
         "LOCATION": "Location"
       },
-      "INVITE": "Invite"
+      "INVITE": "Invite",
+      "TRADE": "Trade",
+      "CANCEL_TRADE_INVITE": "Cancel trade invite"
+    },
+    "TRADE_MENU": {
+      "INVITES_TITLE": "Trade invitations",
+      "NO_INVITES": "No pending trade invitations.",
+      "INVITE_ACTIONS": {
+        "ACCEPT": "Accept",
+        "DECLINE": "Decline"
+      },
+      "TRADING_WITH": "Trading with {{name}}",
+      "COUNTDOWN": "Finalizing in {{seconds}}s",
+      "SELF_READY": "You are ready",
+      "SELF_NOT_READY": "You are not ready",
+      "PARTNER_READY": "{{name}} is ready",
+      "PARTNER_NOT_READY": "{{name}} is not ready",
+      "ACTIONS": {
+        "READY": "Ready up",
+        "UNREADY": "Cancel ready",
+        "CANCEL_TRADE": "Cancel trade",
+        "CLEAR": "Clear",
+        "OFFER_ALL": "Offer all",
+        "CLOSE": "Close window"
+      },
+      "INVENTORY_TITLE": "Your inventory",
+      "NO_INVENTORY": "No tradable items available.",
+      "ITEM_COLUMNS": {
+        "NAME": "Item",
+        "AVAILABLE": "Available",
+        "OFFERED": "Offered"
+      },
+      "QUEST_ITEM_WARNING": "Quest items cannot be traded.",
+      "OFFER_TITLE": "Your offer",
+      "EMPTY_OFFER": "You are not offering any items.",
+      "PARTNER_OFFER_TITLE": "Partner offer",
+      "EMPTY_PARTNER_OFFER": "The partner is not offering any items.",
+      "NO_ACTIVE_TRADE": "No active trade session.",
+      "DETAILS": {
+        "QUEST_ITEM": "Quest item",
+        "ENCHANTED": "Enchanted",
+        "ENCHANT_REMOVE": "Removes enchant on unequip",
+        "CHARGE": "Charge: {{value}}",
+        "POISON": "Poisoned ({{count}})",
+        "SOUL_LEVEL": "Soul level: {{level}}",
+        "EXTRA_HEALTH": "Refined (+{{value}})",
+        "CUSTOM_NAME": "Custom item"
+      }
     },
     "PLAYER_MANAGER": {
       "PLAYER_LIST": "Player List",
@@ -84,8 +148,114 @@
       "REVEAL_PLAYERS": "Reveal Players",
       "RECONNECT": "Reconnect",
       "PLAYER_MANAGER": "Player Manager",
+      "EMOTES": "Emotes",
       "SETTINGS": "Settings",
       "CONNECTION_IN_PROGRESS": "Connection in progress..."
+    },
+    "EMOTE_MENU": {
+      "TITLE": "Emote Wheel",
+      "EYEBROW": "Express yourself",
+      "SUBTITLE": "Pick a pose or flourish; the animation plays for everyone nearby.",
+      "HINT": "Tap B to reopen quickly",
+      "NO_RESULTS": "No emotes in this category",
+      "FILTERS": {
+        "GREETING": "Greetings",
+        "MUSIC": "Music",
+        "SOCIAL": "Social",
+        "RELAX": "Relax",
+        "MISC": "Utility"
+      },
+      "CLOSE": "Close menu",
+      "EMOTES": {
+        "WAVE": {
+          "TITLE": "Wave",
+          "DESC": "Friendly greeting with a quick arm sweep."
+        },
+        "PRAY": {
+          "TITLE": "Kneel & Pray",
+          "DESC": "Drop to one knee and offer a silent prayer."
+        },
+        "WARM_HANDS": {
+          "TITLE": "Warm Hands",
+          "DESC": "Rub your hands together like you are gathered around a fire."
+        },
+        "HANDS_BEHIND_BACK": {
+          "TITLE": "Hands Behind Back",
+          "DESC": "Stand at ease."
+        },
+        "SIT": {
+          "TITLE": "Sit",
+          "DESC": "Sit cross-legged and rest for a moment."
+        },
+        "LEAN": {
+          "TITLE": "Lean",
+          "DESC": "Lean against nearby cover and take a breather."
+        },
+        "DRINK": {
+          "TITLE": "Drink",
+          "DESC": "Take a hearty sip from your mug."
+        },
+        "EAT": {
+          "TITLE": "Snack",
+          "DESC": "Take a bite from your provisions."
+        },
+        "CLAP": {
+          "TITLE": "Clap",
+          "DESC": "Clap enthusiastically."
+        },
+        "CHEER": {
+          "TITLE": "Cheer",
+          "DESC": "Pump both arms in celebration."
+        },
+        "DANCE_CICERO_1": {
+          "TITLE": "Dance (Wild Jig)",
+          "DESC": "Spin and kick like a jester."
+        },
+        "DANCE_CICERO_2": {
+          "TITLE": "Dance (Clap & Step)",
+          "DESC": "Clap in rhythm and shuffle your feet."
+        },
+        "DANCE_CICERO_3": {
+          "TITLE": "Dance (Twirl)",
+          "DESC": "Twirl dramatically like Cicero."
+        },
+        "DRUM": {
+          "TITLE": "Drum Solo",
+          "DESC": "Bust out a deep, percussive rhythm."
+        },
+        "LAUGH": {
+          "TITLE": "Laugh",
+          "DESC": "Laugh out loud at the scene."
+        },
+        "WALL_LEAN": {
+          "TITLE": "Wall Lean",
+          "DESC": "Lean back and take a rest."
+        },
+        "COWER": {
+          "TITLE": "Cower",
+          "DESC": "Curl up defensively."
+        },
+        "BEGGAR": {
+          "TITLE": "Beg",
+          "DESC": "Sit and hold out your hands."
+        },
+        "SWEEP": {
+          "TITLE": "Sweep",
+          "DESC": "Grab a broom and tidy up the floor."
+        },
+        "FLUTE": {
+          "TITLE": "Flute",
+          "DESC": "Play a light tune to break the silence."
+        },
+        "LUTE": {
+          "TITLE": "Lute",
+          "DESC": "Strum a bardic chord progression."
+        },
+        "STOP": {
+          "TITLE": "Reset",
+          "DESC": "Cancel the current emote and return to idle."
+        }
+      }
     },
     "SERVER_LIST": {
       "SEARCH": "Search...",
@@ -140,6 +310,13 @@
         "L": "Large",
         "XL": "Extra Large"
       },
+      "NAMETAG_MODE": "Nametag Style",
+      "NAMETAG_MODES": {
+        "NORMAL": "Classic (avatar + level stacked)",
+        "DETAILED": "Compact (avatar + level)",
+        "BASIC": "Name only",
+        "HIDDEN": "Hidden"
+      },
       "BACK": "Back"
     }
   },
@@ -168,6 +345,9 @@
         "MODS_MISMATCH_INSTALL": "Please install the following mods to join:\n{{mods}}",
         "CLIENT_MODS_DISALLOWED": "This server disallows {{mods}}. Please remove them to join.",
         "WRONG_PASSWORD": "The password you entered is incorrect.",
+        "WRONG_ACCOUNT_PASSWORD": "The account password you entered is incorrect.",
+        "WRONG_SERVER_PASSWORD": "The server password you entered is incorrect.",
+        "DUPLICATE_USER": "You are already connected to this server.",
         "NO_REASON": "The server refused connection without reason.",
         "SERVER_FULL": "This server is full.",
         "BAD_UGRIDSTOLOAD": "It seems that your Skyrim.ini file has a non-default value for 'uGridsToLoad'. THIS IS A VERY BAD IDEA, and will most likely break the mod. Please set this setting back to its default (5), or remove the Skyrim.ini file and launch Skyrim vanilla once to generate a new file. The settings 'uExterior Cell Buffer' and 'uInterior Cell Buffer' should also be left at the default setting. If you do not know how to do this, please refer to our wiki or ask on our Discord server/Reddit sub for help.",
@@ -175,7 +355,29 @@
       }
     },
     "PLAYER_LIST": {
-      "PARTY_INVITE": "{{from}} invited you to join a party"
+      "PARTY_INVITE": "{{from}} invited you to join a party",
+      "TELEPORT_REQUEST": "{{from}} wants to teleport to you.",
+      "TRADE_INVITE": "{{from}} wants to trade with you."
+    },
+    "TRADE": {
+      "UNKNOWN_PLAYER": "Player {{id}}",
+      "CANCELLED": "{{partner}} cancelled the trade ({{reason}}).",
+      "COMPLETED": "Trade completed with {{partner}}.",
+      "INVITE_SENT": "Trade invite sent to {{target}}.",
+      "CANCELLED_REASONS": {
+        "DECLINED": "Invite declined",
+        "CANCELLED": "Trade cancelled",
+        "PARTNER_BUSY": "Partner is busy",
+        "SELF_BUSY": "You are busy",
+        "PLAYER_LEFT": "Player left the session",
+        "TIMEOUT": "Invitation expired",
+        "FAILED_VALIDATION": "Trade failed validation",
+        "UNKNOWN": "Unknown reason"
+      }
+    },
+    "OVERLAY_BANNER": {
+      "TELEPORT_COUNTDOWN_TITLE": "Teleporting to {{name}}",
+      "TELEPORT_COUNTDOWN_SUBTITLE": "Teleporting in {{seconds}}s"
     }
   }
 }

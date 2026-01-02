@@ -1,0 +1,85 @@
+[0mchecking for platform ... [38;2;0;255;0;1mlinux[0m
+[0mchecking for architecture ... [38;2;0;255;0;1mx86_64[0m
+[0m[38;2;255;255;0m  => [0minstall sentry-native 0.7.1 .. [38;2;255;0;0;1mfailed[0m
+
+ninja: Entering directory `/home/jacobwasbeast/.xmake/cache/packages/2511/s/sentry-native/0.7.1/source/build_1ee624b5'
+[1/233] Building CXX object crashpad_build/third_party/mini_chromium/CMakeFiles/mini_chromium.dir/mini_chromium/base/debug/alias.cc.o
+[2/233] Building CXX object crashpad_build/third_party/mini_chromium/CMakeFiles/mini_chromium.dir/mini_chromium/base/memory/page_size_posix.cc.o
+[3/233] Building CXX object crashpad_build/third_party/mini_chromium/CMakeFiles/mini_chromium.dir/mini_chromium/base/process/memory.cc.o
+[4/233] Building CXX object crashpad_build/compat/CMakeFiles/crashpad_compat.dir/linux/sys/mman_memfd_create.cc.o
+In file included from /home/jacobwasbeast/.xmake/cache/packages/2511/s/sentry-native/0.7.1/source/external/crashpad/compat/linux/sys/mman_memfd_create.cc:21:
+/home/jacobwasbeast/.xmake/cache/packages/2511/s/sentry-native/0.7.1/source/external/crashpad/util/misc/no_cfi_icall.h:55:75: warning: ‘cfi-icall’ attribute directive ignored [-Wattributes]
+   55 |   DISABLE_CFI_ICALL static R Invoke(Function&& function, RunArgs&&... args) {
+      |                                                                           ^
+/home/jacobwasbeast/.xmake/cache/packages/2511/s/sentry-native/0.7.1/source/external/crashpad/util/misc/no_cfi_icall.h:63:75: warning: ‘cfi-icall’ attribute directive ignored [-Wattributes]
+   63 |   DISABLE_CFI_ICALL static R Invoke(Function&& function, RunArgs&&... args) {
+      |                                                                           ^
+/home/jacobwasbeast/.xmake/cache/packages/2511/s/sentry-native/0.7.1/source/external/crashpad/util/misc/no_cfi_icall.h:87:75: warning: ‘cfi-icall’ attribute directive ignored [-Wattributes]
+   87 |   DISABLE_CFI_ICALL static R Invoke(Function&& function, RunArgs&&... args) {
+      |                                                                           ^
+/home/jacobwasbeast/.xmake/cache/packages/2511/s/sentry-native/0.7.1/source/external/crashpad/util/misc/no_cfi_icall.h:95:75: warning: ‘cfi-icall’ attribute directive ignored [-Wattributes]
+   95 |   DISABLE_CFI_ICALL static R Invoke(Function&& function, RunArgs&&... args) {
+[0mif you want to get more verbose errors, please see:[0m
+[0m  -> [1m/home/jacobwasbeast/.xmake/cache/packages/2511/s/sentry-native/0.7.1/installdir.failed/logs/install.txt[0m
+[0m[38;2;255;255;0m  => [0minstall abseil 20250127.1 .. [38;2;255;0;0;1mfailed[0m
+
+ninja: Entering directory `/tmp/.xmake1000/251110/_9373ba58e0e1d332a88a035a7a08ccf2.dir'
+[1/250] Building CXX object absl/strings/CMakeFiles/strings_internal.dir/internal/utf8.cc.o
+[2/250] Building CXX object absl/debugging/CMakeFiles/utf8_for_code_point.dir/internal/utf8_for_code_point.cc.o
+[3/250] Building CXX object absl/base/CMakeFiles/base.dir/internal/unscaledcycleclock.cc.o
+[4/250] Linking CXX static library absl/debugging/libabsl_utf8_for_code_point.a
+[5/250] Building CXX object absl/base/CMakeFiles/spinlock_wait.dir/internal/spinlock_wait.cc.o
+[6/250] Building CXX object absl/base/CMakeFiles/base.dir/internal/cycleclock.cc.o
+[7/250] Linking CXX static library absl/base/libabsl_spinlock_wait.a
+[8/250] Building CXX object absl/types/CMakeFiles/bad_optional_access.dir/bad_optional_access.cc.o
+[9/250] Building CXX object absl/strings/CMakeFiles/strings_internal.dir/internal/ostringstream.cc.o
+[10/250] Building CXX object absl/base/CMakeFiles/log_severity.dir/log_severity.cc.o
+[11/250] Building CXX object absl/base/CMakeFiles/raw_logging_internal.dir/internal/raw_logging.cc.o
+[12/250] Building CXX object absl/base/CMakeFiles/throw_delegate.dir/internal/throw_delegate.cc.o
+[13/250] Building CXX object absl/crc/CMakeFiles/crc_cpu_detect.dir/internal/cpu_detect.cc.o
+[14/250] Linking CXX static library absl/base/libabsl_log_severity.a
+[15/250] Building CXX object absl/strings/CMakeFiles/string_view.dir/string_view.cc.o
+[16/250] Linking CXX static library absl/base/libabsl_raw_logging_internal.a
+[0mif you want to get more verbose errors, please see:[0m
+[0m  -> [1m/home/jacobwasbeast/.xmake/cache/packages/2511/a/abseil/20250127.1/installdir.failed/logs/install.txt[0m
+[0m[38;2;255;255;0m  => [0minstall snappy 1.1.10 .. [38;2;255;0;0;1mfailed[0m
+
+-- The C compiler identification is GNU 15.2.1
+-- The CXX compiler identification is GNU 15.2.1
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Looking for sys/mman.h
+-- Looking for sys/mman.h - found
+-- Looking for sys/resource.h
+-- Looking for sys/resource.h - found
+-- Looking for sys/time.h
+[0mif you want to get more verbose errors, please see:[0m
+[0m  -> [1m/home/jacobwasbeast/.xmake/cache/packages/2511/s/snappy/1.1.10/installdir.failed/logs/install.txt[0m
+[0m[38;2;255;255;0m  => [0minstall tiltedcore v0.2.7 .. [38;2;255;0;0;1mfailed[0m
+
+[0m[38;2;0;255;0;1m[ 76%]:[0m cache compiling.release Code/tests/src/core.cpp[0m
+[0m[38;2;0;255;0;1m[ 76%]:[0m cache compiling.release Code/tests/src/main.cpp[0m
+[0m[38;2;0;255;0;1m[ 76%]:[0m cache compiling.release Code/core/src/Allocator.cpp[0m
+[0m[38;2;0;255;0;1m[ 76%]:[0m cache compiling.release Code/core/src/Buffer.cpp[0m
+[0m[38;2;0;255;0;1m[ 76%]:[0m cache compiling.release Code/core/src/BoundedAllocator.cpp[0m
+[0m[38;2;0;255;0;1m[ 76%]:[0m cache compiling.release Code/core/src/Filesystem.cpp[0m
+[0m[38;2;0;255;0;1m[ 76%]:[0m cache compiling.release Code/core/src/Hash.cpp[0m
+[0m[38;2;0;255;0;1m[ 76%]:[0m cache compiling.release Code/core/src/MimallocAllocator.cpp[0m
+[0m[38;2;0;255;0;1m[ 76%]:[0m cache compiling.release Code/core/src/Math.cpp[0m
+[0m[38;2;0;255;0;1m[ 76%]:[0m cache compiling.release Code/core/src/ScratchAllocator.cpp[0m
+[0m[38;2;0;255;0;1m[ 76%]:[0m cache compiling.release Code/core/src/Serialization.cpp[0m
+[0m[38;2;0;255;0;1m[ 76%]:[0m cache compiling.release Code/core/src/StandardAllocator.cpp[0m
+[0m[38;2;0;255;0;1m[ 76%]:[0m cache compiling.release Code/core/src/TaskQueue.cpp[0m
+[0m[38;2;0;255;0;1m[ 76%]:[0m cache compiling.release Code/core/src/ViewBuffer.cpp[0m
+[0mif you want to get more verbose errors, please see:[0m
+[0m  -> [1m/home/jacobwasbeast/.xmake/cache/packages/2511/t/tiltedcore/v0.2.7/installdir.failed/logs/install.txt[0m
+[0m[1;38;2;255;0;0;1merror: [0minstall failed![0m
+[0m[1;38;2;255;255;0;1mwarning: [38;2;255;255;0;1m{buildir = } has been deprecated, please use {builddir = } in cmake.install[0m

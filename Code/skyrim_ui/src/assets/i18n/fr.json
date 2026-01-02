@@ -13,6 +13,9 @@
         "HELGEN": "Ne vous connectez PAS à un serveur si vous êtes toujours dans la séquence d'introduction de Helgen. Assurez-vous d'abord d'avoir fui Helgen."
       },
       "ADDRESS": "Addresse",
+      "USERNAME": "Nom d'utilisateur",
+      "ACCOUNT_PASSWORD": "Mot de passe du compte",
+      "SERVER_PASSWORD": "Mot de passe du serveur",
       "PASSWORD": "Mot de passe",
       "SAVE_PASSWORD": "Enregistrer le mot de passe ?",
       "CONNECT": "Connexion",
@@ -21,7 +24,8 @@
       "ERROR": {
         "CONNECTION": "Impossible de se connecter au serveur spécifié. Veuillez vous assurer que vous avez correctement entré l'adresse et que vous ne rencontrez pas de problèmes de réseau.",
         "VERSION_MISMATCH": "Vous ne pouvez pas vous connecter au serveur car il ne dispose pas de la même version de Skyrim Together que vous.",
-        "INVALID_ADDRESS": "Le format de l'adresse est invalide. [Adresse:Port]"
+        "INVALID_ADDRESS": "Le format de l'adresse est invalide. [Adresse:Port]",
+        "INVALID_USERNAME": "Veuillez saisir un nom d'utilisateur."
       }
     },
     "DISCONNECT": {
@@ -58,7 +62,9 @@
       },
       "ACTIONS": {
         "KICK": "Exclure",
-        "TELEPORT": "Téléporter",
+        "ASK_TELEPORT": "Demander une téléportation",
+        "ACCEPT_TELEPORT": "Accepter la téléportation",
+        "DENY_TELEPORT": "Refuser la téléportation",
         "MAKE_LEADER": "En faire le chef de groupe"
       },
       "LEAVE_PARTY": "Quitter le groupe"
@@ -133,6 +139,13 @@
         "L": "Grande",
         "XL": "Très grande"
       },
+      "NAMETAG_MODE": "Mode des étiquettes",
+      "NAMETAG_MODES": {
+        "NORMAL": "Classique (avatar + niveau empilé)",
+        "DETAILED": "Compact (avatar + niveau)",
+        "BASIC": "Nom uniquement",
+        "HIDDEN": "Masqué"
+      },
       "BACK": "Retour"
     }
   },
@@ -160,12 +173,19 @@
         "MODS_MISMATCH_INSTALL": "Veuillez installer les mods suivants pour rejoindre ce serveur :\n{{mods}}",
         "CLIENT_MODS_DISALLOWED": "Ce serveur n'autorise pas : {{mods}}. Veuillez les retirer pour rejoindre le serveur.",
         "WRONG_PASSWORD": "Le mot de passe que vous avez saisi est incorrect.",
+        "WRONG_ACCOUNT_PASSWORD": "Le mot de passe du compte est incorrect.",
+        "WRONG_SERVER_PASSWORD": "Le mot de passe du serveur est incorrect.",
         "NO_REASON": "Le serveur a refusé la connexion sans raison.",
         "SERVER_FULL": "Le serveur est plein."
       }
     },
     "PLAYER_LIST": {
-      "PARTY_INVITE": "{{from}} vous a invité à jouer."
+      "PARTY_INVITE": "{{from}} vous a invité à jouer.",
+      "TELEPORT_REQUEST": "{{from}} souhaite se téléporter jusqu'à vous."
+    },
+    "OVERLAY_BANNER": {
+      "TELEPORT_COUNTDOWN_TITLE": "Téléportation vers {{name}}",
+      "TELEPORT_COUNTDOWN_SUBTITLE": "Téléportation dans {{seconds}} s"
     }
   }
 }

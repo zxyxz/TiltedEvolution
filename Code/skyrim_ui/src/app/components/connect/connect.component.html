@@ -16,7 +16,14 @@
   />
   <input
     type="text"
-    [placeholder]="'COMPONENT.CONNECT.PASSWORD' | transloco"
+    [placeholder]="'COMPONENT.CONNECT.USERNAME' | transloco"
+    (keydown.enter)="connect()"
+    [(ngModel)]="username"
+    spellcheck="false"
+  />
+  <input
+    type="password"
+    [placeholder]="'COMPONENT.CONNECT.ACCOUNT_PASSWORD' | transloco"
     spellcheck="false"
     [(ngModel)]="password"
     (keydown.enter)="connect()"

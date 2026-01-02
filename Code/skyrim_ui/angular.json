@@ -28,25 +28,22 @@
             "optimization": false,
             "namedChunks": true,
             "stylePreprocessorOptions": {
-              "includePaths": [
-                "src",
-                "src/styles"
-              ]
+              "includePaths": ["src", "src/styles"]
             },
             "tsConfig": "tsconfig.app.json",
             "assets": [
               "src/favicon.ico",
               "src/assets/sounds/",
-              "src/assets/i18n/"
+              "src/assets/i18n/",
+              {
+                "glob": "avatar-placeholder.png",
+                "input": "src/assets/images/group",
+                "output": "assets/images/group"
+              }
             ],
-            "styles": [
-              "src/styles.scss"
-            ],
+            "styles": ["src/styles.scss"],
             "scripts": [],
-            "allowedCommonJsDependencies": [
-              "flat",
-              "events"
-            ]
+            "allowedCommonJsDependencies": ["flat", "events"]
           },
           "configurations": {
             "production": {
@@ -138,9 +135,7 @@
               "tsconfig.spec.json",
               "e2e/tsconfig.json"
             ],
-            "exclude": [
-              "**/node_modules/**"
-            ]
+            "exclude": ["**/node_modules/**"]
           }
         },
         "e2e": {

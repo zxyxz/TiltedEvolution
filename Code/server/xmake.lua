@@ -1,6 +1,8 @@
 local function istable(t) return type(t) == 'table' end
 
 add_requires("sol2 v3.3.0", {configs = {lua = "lua"}})
+add_requires("sqlite3")
+add_requires("fmt")
 
 local function build_server()
     set_kind("shared")
@@ -24,7 +26,6 @@ local function build_server()
         "ESLoader",
         "CrashHandler",
         "BaseLib",
-        "AdminProtocol",
         "TiltedConnect"
     )
     add_packages(
@@ -32,6 +33,7 @@ local function build_server()
         "spdlog",
         "hopscotch-map",
         "sqlite3",
+        "fmt",
         "lua",
         "sol2",
         "glm",

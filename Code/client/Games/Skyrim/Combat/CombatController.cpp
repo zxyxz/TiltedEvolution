@@ -1,6 +1,37 @@
 #include "CombatController.h"
 #include "CombatTargetSelector.h"
 
+#include <World.h>
+#include <Components.h>
+#include <Services/SyncModeService.h>
+#include <Games/Skyrim/Actor.h>
+#include <Games/ActorExtension.h>
+
+namespace
+{
+bool IsRemoteGhostActor(Actor* apActor)
+{
+    if (!apActor || !entt::locator<World>::has_value())
+        return false;
+
+    auto* pExt = apActor->GetExtension();
+    if (!pExt || !pExt->IsRemotePlayer())
+        return false;
+
+    auto& world = World::Get();
+
+    if (world.GetSyncModeService().GetLocalMode() == SyncMode::Ghost)
+        return true;
+
+    auto view = world.view<FormIdComponent, GhostComponent>();
+    const auto it = std::find_if(view.begin(), view.end(),
+        [view, formId = apActor->formID](entt::entity e)
+        { return view.get<FormIdComponent>(e).Id == formId && view.get<GhostComponent>(e).IsGhost; });
+
+    return it != view.end();
+}
+} // namespace
+
 void ArrayQuickSortRecursiveCombatTargets(GameArray<CombatTargetSelector*>* apArray, uint32_t aiLowIndex,
                                           uint32_t aiHighIndex)
 {
@@ -64,7 +95,31 @@ static TUpdateTarget* RealUpdateTarget = nullptr;
 
 void TP_MAKE_THISCALL(HookUpdateTarget, CombatController)
 {
-    apThis->UpdateTarget();
+    // Drop ghosted remote targets before running target selection.
+    if (Actor* pCurrentTarget = Cast<Actor>(TESObjectREFR::GetByHandle(apThis->targetHandle)))
+    {
+        if (IsRemoteGhostActor(pCurrentTarget))
+        {
+            apThis->SetTarget(nullptr);
+
+            if (Actor* pAttacker = Cast<Actor>(TESObjectREFR::GetByHandle(apThis->attackerHandle)))
+                pAttacker->SetCombatTargetEx(nullptr);
+        }
+    }
+
+    TiltedPhoques::ThisCall(RealUpdateTarget, apThis);
+
+    // Ensure any newly chosen target isn't a ghosted remote player.
+    if (Actor* pNewTarget = Cast<Actor>(TESObjectREFR::GetByHandle(apThis->targetHandle)))
+    {
+        if (IsRemoteGhostActor(pNewTarget))
+        {
+            apThis->SetTarget(nullptr);
+
+            if (Actor* pAttacker = Cast<Actor>(TESObjectREFR::GetByHandle(apThis->attackerHandle)))
+                pAttacker->SetCombatTargetEx(nullptr);
+        }
+    }
 }
 
 void CombatController::SetTarget(Actor* apTarget)
@@ -77,12 +132,9 @@ void CombatController::SetTarget(Actor* apTarget)
 static TiltedPhoques::Initializer s_combatControllerHooks(
     []()
     {
-#if 0
         POINTER_SKYRIMSE(TUpdateTarget, s_updateTarget, 33236);
 
         RealUpdateTarget = s_updateTarget.Get();
 
         TP_HOOK(&RealUpdateTarget, HookUpdateTarget);
-#endif
     });
-

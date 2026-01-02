@@ -28,19 +28,31 @@ export class SkyrimtogetherMock extends EventEmitter implements SkyrimTogether {
   private playerName = 'Local Player';
   private showEvents = true;
   private localPlayerId: number;
+  private nametagMode = 0;
   public readonly players$ = playerStore.pipe(selectAllEntities());
+  private pendingTeleportRequests = new Set<number>();
 
-  connect(host: string, port: number, password: string): void {
+  connect(
+    host: string,
+    port: number,
+    username: string,
+    password: string,
+    serverPassword = '',
+  ): void {
     if (!this.connected) {
       let error: ErrorEvents | boolean;
+      const effectivePassword = serverPassword || password;
+      if (username && username.length > 0) {
+        this.playerName = username;
+      }
       switch (host) {
         case 't-port':
         case 't-host':
           error = true;
           break;
         case 't-password':
-          if (password !== 'test') {
-            error = { error: 'wrong_password' };
+          if (effectivePassword !== 'test') {
+            error = { error: 'wrong_server_password' };
           }
           break;
         case 't-version':
@@ -106,11 +118,21 @@ export class SkyrimtogetherMock extends EventEmitter implements SkyrimTogether {
   }
 
   revealPlayers(): void {
-    this.sendMessage(MessageTypes.SYSTEM_MESSAGE, "Revealing players...");
+    this.sendMessage(MessageTypes.SYSTEM_MESSAGE, 'Revealing players...');
+  }
+
+  playEmote(eventName: string): void {
+    this.sendMessage(
+      MessageTypes.SYSTEM_MESSAGE,
+      `Playing emote "${eventName}"`,
+    );
   }
 
   setTime(hours: number, minutes: number): void {
-    this.sendMessage(MessageTypes.SYSTEM_MESSAGE, `Setting time to "${hours}:${minutes}"!`);
+    this.sendMessage(
+      MessageTypes.SYSTEM_MESSAGE,
+      `Setting time to "${hours}:${minutes}"!`,
+    );
   }
 
   sendMessage(type: MessageTypes, message: string): void {
@@ -124,26 +146,88 @@ export class SkyrimtogetherMock extends EventEmitter implements SkyrimTogether {
   }
 
   teleportToPlayer(playerId: number): void {
-    if (this.connected) {
-      const player = playerStore.query(getEntity(playerId));
-      if (player) {
-        console.log(
-          `%cTELEPORT`,
-          'background: #F09688; color: #fff; padding: 3px; font-size: 9px;',
-          'Teleport to player',
-          JSON.stringify(player.name),
-          `(${player.id})`,
-          'in',
-          JSON.stringify(player.cellName),
-        );
-      }
+    if (!this.connected) {
+      return;
     }
+
+    const player = playerStore.query(getEntity(playerId));
+    const name = player ? player.name : `Player ${playerId}`;
+
+    this.sendMessage(
+      MessageTypes.SYSTEM_MESSAGE,
+      `Teleport request sent to "${name}".`,
+    );
+  }
+
+  respondTeleportRequest(requesterId: number, accepted: boolean): void {
+    if (!this.connected) {
+      return;
+    }
+
+    this.pendingTeleportRequests.delete(requesterId);
+    const player = playerStore.query(getEntity(requesterId));
+    const name = player ? player.name : `Player ${requesterId}`;
+    this.sendMessage(
+      MessageTypes.SYSTEM_MESSAGE,
+      accepted
+        ? `Accepted teleport request from player ${requesterId}.`
+        : `Declined teleport request from player ${requesterId}.`,
+    );
+
+    if (accepted) {
+      this.emit('teleportCountdown', requesterId, name, 5, false, '');
+      setTimeout(() => {
+        this.emit('teleportCountdown', requesterId, name, 0, true, '');
+      }, 1000);
+    }
+  }
+
+  setMockTeleportRequest(requesterId: number, requesterName: string): void {
+    if (!this.connected) {
+      return;
+    }
+
+    this.pendingTeleportRequests.add(requesterId);
+    this.emit('teleportRequest', requesterId, requesterName);
+  }
+
+  setMockTeleportCountdown(
+    targetPlayerId: number,
+    targetName: string,
+    secondsRemaining: number,
+    cancelled = false,
+    reason = '',
+  ): void {
+    if (!this.connected) {
+      return;
+    }
+
+    this.emit(
+      'teleportCountdown',
+      targetPlayerId,
+      targetName,
+      secondsRemaining,
+      cancelled,
+      reason,
+    );
   }
 
   launchParty(): void {
     if (this.connected) {
       this.emit('partyCreated');
     }
+  }
+
+  showBanner(message: string, durationMs?: number): void {
+    this.emit('showBanner', message, durationMs);
+  }
+
+  openEmoteMenu(openedFromInactive?: boolean): void {
+    this.emit('openEmoteMenu', openedFromInactive);
+  }
+
+  toggleEmoteMenu(): void {
+    this.emit('toggleEmoteMenu');
   }
 
   createPartyInvite(playerId: number): void {
@@ -197,6 +281,58 @@ export class SkyrimtogetherMock extends EventEmitter implements SkyrimTogether {
     );
   }
 
+  sendTradeInvite(playerId: number): void {
+    if (!this.connected) {
+      return;
+    }
+    if (this.showEvents) {
+      console.log('[mock] sendTradeInvite', playerId);
+    }
+  }
+
+  respondTradeInvite(playerId: number, accept: boolean): void {
+    if (!this.connected) {
+      return;
+    }
+    if (this.showEvents) {
+      console.log('[mock] respondTradeInvite', playerId, accept);
+    }
+  }
+
+  cancelTrade(): void {
+    if (!this.connected) {
+      return;
+    }
+    if (this.showEvents) {
+      console.log('[mock] cancelTrade');
+    }
+  }
+
+  setTradeReady(ready: boolean): void {
+    if (!this.connected) {
+      return;
+    }
+    if (this.showEvents) {
+      console.log('[mock] setTradeReady', ready);
+    }
+  }
+
+  updateTradeOffer(entries: SkyrimTogetherTypes.TradeOfferEntry[]): void {
+    if (!this.connected) {
+      return;
+    }
+    if (this.showEvents) {
+      console.log('[mock] updateTradeOffer', entries);
+    }
+  }
+
+  setNameTagMode(mode: number): void {
+    this.nametagMode = mode;
+    if (this.showEvents) {
+      console.log('[mock] setNameTagMode', mode);
+    }
+  }
+
   initMock() {
     Object.keys((this as any)._events).forEach(e => {
       this.on(e, (...params) => {
@@ -217,6 +353,7 @@ export class SkyrimtogetherMock extends EventEmitter implements SkyrimTogether {
     this.emit('enterGame');
     this.emit('setVersion', this.version);
     this.emit('setName', this.playerName);
+    this.emit('setSyncStatus', false, '', '', '');
 
     fromEvent(window, 'keydown').subscribe((event: KeyboardEvent) => {
       if (event.ctrlKey && event.location === 2) {

@@ -115,7 +115,7 @@ export class ServerListComponent {
           const shortClientVersion = this.getClientVersion(clientVersion);
           return {
             ...server,
-            hasPassword: server.pass,
+            hasPassword: !!server.pass,
             isFavorite: !!favorites[`${server.ip}:${server.port}`],
             isFull: server.player_count >= server.max_player_count,
             shortVersion,
@@ -199,9 +199,13 @@ export class ServerListComponent {
       map(fontSize => fontSizeToPixels[fontSize] * 2),
     );
 
-    this.hideVersionMismatchedServers.next(this.uiRepository.getHideVersionMismatchedServers());
+    this.hideVersionMismatchedServers.next(
+      this.uiRepository.getHideVersionMismatchedServers(),
+    );
     this.hideFullServers.next(this.uiRepository.getHideFullServers());
-    this.hidePasswordProtectedServers.next(this.uiRepository.getHidePasswordProtectedServers());
+    this.hidePasswordProtectedServers.next(
+      this.uiRepository.getHidePasswordProtectedServers(),
+    );
   }
 
   public cancel(): void {
@@ -213,12 +217,12 @@ export class ServerListComponent {
   }
 
   public onHideVersionMismatchedServers(state: boolean) {
-    this.hideVersionMismatchedServers.next(state)
+    this.hideVersionMismatchedServers.next(state);
     this.uiRepository.setHideVersionMismatchedServers(state);
   }
 
   public onHideFullServers(state: boolean) {
-    this.hideFullServers.next(state)
+    this.hideFullServers.next(state);
     this.uiRepository.setHideFullServers(state);
   }
 
@@ -310,7 +314,12 @@ export class ServerListComponent {
   // }
 
   public connect(server: Server) {
-    this.clientService.connect(server.ip, server.port ? server.port : 10578);
+    this.clientService.connect(
+      server.ip,
+      server.port ? server.port : 10578,
+      this.storeService.get('last_connected_username', ''),
+      this.storeService.get('last_connected_password', ''),
+    );
     this.soundService.play(Sound.Ok);
     this.close();
   }
@@ -320,6 +329,9 @@ export class ServerListComponent {
       server.ip,
       server.port,
       server.name,
+      View.SERVER_LIST,
+      this.storeService.get('last_connected_username', ''),
+      this.storeService.get('last_connected_password', ''),
     );
   }
 

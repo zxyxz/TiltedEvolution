@@ -1,0 +1,35 @@
+<ng-container *ngIf="status$ | async as status">
+  <div
+    *ngIf="status.isolated"
+    class="sync-status-badge"
+    [title]="status.moreInfo || status.detail"
+  >
+    <div class="sync-status-badge-indicator"></div>
+    <div class="sync-status-badge-text">
+      <div class="sync-status-badge-header">
+        <div class="sync-status-badge-title">
+          {{ status.title || 'Quest Isolation' }}
+        </div>
+        <button
+          class="sync-status-badge-more-button"
+          type="button"
+          *ngIf="status.moreInfo"
+          (click)="toggleMoreInfo()"
+          aria-label="Toggle quest isolation details"
+          [class.is-open]="showMoreInfo"
+        >
+          ▾
+        </button>
+      </div>
+      <div class="sync-status-badge-detail">
+        {{ status.detail || 'Sync paused' }}
+      </div>
+      <div
+        class="sync-status-badge-more"
+        *ngIf="status.moreInfo && showMoreInfo"
+      >
+        {{ status.moreInfo }}
+      </div>
+    </div>
+  </div>
+</ng-container>

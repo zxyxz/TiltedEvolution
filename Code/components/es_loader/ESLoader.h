@@ -1,6 +1,6 @@
 #pragma once
 
-#include <TESFile.h>
+#include "TESFile.h"
 
 namespace fs = std::filesystem;
 
@@ -36,12 +36,15 @@ public:
 
 private:
     bool LoadLoadOrder();
+    bool LoadLoadOrderFromDisk();
     UniquePtr<RecordCollection> LoadFiles();
 
     fs::path GetPath(String& aFilename);
 
-    fs::path m_directory = "";
+    fs::path m_directory{};
+    fs::path m_loadOrderFile{};
+    fs::path m_pluginsFile{};
     Vector<PluginData> m_loadOrder{};
-    TiltedPhoques::Map<String, uint8_t> m_masterFiles{};
+    TiltedPhoques::Map<String, uint32_t> m_masterFiles{};
 };
 } // namespace ESLoader

@@ -8,7 +8,8 @@ void NotifyPlayerList::SerializeRaw(TiltedPhoques::Buffer::Writer& aWriter) cons
     for (auto& player : Players)
     {
         Serialization::WriteVarInt(aWriter, player.first);
-        Serialization::WriteString(aWriter, player.second);
+        Serialization::WriteString(aWriter, player.second.Name);
+        Serialization::WriteString(aWriter, player.second.Avatar);
     }
 }
 
@@ -21,6 +22,9 @@ void NotifyPlayerList::DeserializeRaw(TiltedPhoques::Buffer::Reader& aReader) no
     for (auto i = 0u; i < count; ++i)
     {
         uint32_t id = Serialization::ReadVarInt(aReader) & 0xFFFFFFFF;
-        Players[id] = Serialization::ReadString(aReader);
+        PlayerListEntry entry{};
+        entry.Name = Serialization::ReadString(aReader);
+        entry.Avatar = Serialization::ReadString(aReader);
+        Players[id] = std::move(entry);
     }
 }

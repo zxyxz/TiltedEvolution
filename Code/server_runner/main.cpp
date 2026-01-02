@@ -2,7 +2,6 @@
 #include <TiltedCore/Filesystem.hpp>
 #include <chrono>
 #include <filesystem>
-#include <fstream>
 #include <string>
 #include <thread>
 
@@ -14,9 +13,12 @@
 #include <base/threading/ThreadUtils.h>
 
 #include "DediRunner.h"
+#include "ServerLogSink.h"
+#include "ServerUi.h"
 #include <crash_handler/CrashHandler.h>
 
 #ifdef _WIN32
+#include <Windows.h>
 #include <base/dialogues/win/TaskDialog.h>
 #pragma comment(lib, "Comctl32.lib")
 #elif defined(__linux__)
@@ -45,6 +47,8 @@ extern Console::Setting<bool> bConsole;
 
 GS_IMPORT void SetDefaultLogger(std::shared_ptr<spdlog::logger> aLogger);
 GS_IMPORT void RegisterLogger(std::shared_ptr<spdlog::logger> aLogger);
+GS_IMPORT bool CheckBuildTag(const char* apBuildTag);
+GS_IMPORT void SetUiLogCallback(void (*aCallback)(const char*));
 
 struct LogInstance
 {
@@ -54,19 +58,27 @@ struct LogInstance
     {
         using namespace spdlog;
 
+#ifdef _WIN32
+        SetConsoleOutputCP(CP_UTF8);
+#endif
+
         std::error_code ec;
-        fs::create_directory("logs", ec);
+        const auto logPath = TiltedPhoques::GetPath() / "logs";
+        fs::create_directory(logPath, ec);
 
-        auto consoleOut = spdlog::stdout_color_mt(KCompilerStopThisBullshit);
-        consoleOut->set_pattern(">%$ %v");
+        auto fileOut = std::make_shared<sinks::rotating_file_sink_mt>((logPath / kLogFileName).string(), kLogFileSizeCap, 3);
+        auto consoleSink = std::make_shared<sinks::stdout_color_sink_mt>();
+        consoleSink->set_pattern("%^[%H:%M:%S.%e] [%l] [tid %t] %$ %v");
 
-        // make the client aware of this logger.
+        auto consoleOut = std::make_shared<logger>(KCompilerStopThisBullshit, sinks_init_list{consoleSink, fileOut});
+        consoleOut->set_level(level::from_str(sLogLevel.value()));
+
+        if (!spdlog::get(KCompilerStopThisBullshit))
+            spdlog::register_logger(consoleOut);
+
         RegisterLogger(consoleOut);
 
-        auto fileOut = std::make_shared<sinks::rotating_file_sink_mt>(std::string("logs/") + kLogFileName, kLogFileSizeCap, 3);
-        auto serverOut = std::make_shared<sinks::stdout_color_sink_mt>();
-        serverOut->set_pattern("%^[%H:%M:%S.%e] [%l] [tid %t] %$ %v");
-        auto globalOut = std::make_shared<logger>("", sinks_init_list{serverOut, fileOut});
+        auto globalOut = std::make_shared<logger>("", sinks_init_list{consoleSink, fileOut});
         globalOut->set_level(level::from_str(sLogLevel.value()));
 
         // as the library is compiled into the client + server we have to do this twice
@@ -74,6 +86,8 @@ struct LogInstance
 
         // also make the client aware of the file loggers
         SetDefaultLogger(globalOut);
+
+        AttachServerLogSinkToAllLoggers();
     }
 
     ~LogInstance() { spdlog::shutdown(); }
@@ -143,11 +157,21 @@ static bool IsEULAAccepted()
     const auto path = fs::current_path() / kConfigPathName / kEULAName;
 
     bool preAccept = false;
-    if (char* pValue = std::getenv("TILTED_ACCEPT_EULA"))
+    char* pValue = nullptr;
+#ifdef _WIN32
+    size_t envLength = 0;
+    if (_dupenv_s(&pValue, &envLength, "TILTED_ACCEPT_EULA") == 0 && pValue)
+#else
+    if ((pValue = std::getenv("TILTED_ACCEPT_EULA")) != nullptr)
+#endif
     {
         std::string_view env(pValue);
         preAccept = env == "true" || env == "1" || env == "TRUE";
     }
+#ifdef _WIN32
+    if (pValue)
+        free(pValue);
+#endif
 
     auto saveFile = [&]()
     {
@@ -190,7 +214,14 @@ static bool IsEULAAccepted()
     return true;
 }
 
-GS_IMPORT bool CheckBuildTag(const char* apBuildTag);
+static void UiLogCallback(const char* aLine)
+{
+    if (!aLine)
+        return;
+
+    if (auto sink = GetServerLogSink())
+        sink->PushExternalLine(aLine);
+}
 
 void ConfigureConsoleMode()
 {
@@ -205,14 +236,25 @@ int main(int argc, char** argv)
 {
     ConfigureConsoleMode();
 
+    LogInstance logger;
+    (void)logger;
+
     // the binaries are not from the same commit.
     if (!CheckBuildTag(kBuildTag))
+    {
+#ifdef _WIN32
+        MessageBoxW(nullptr, L"Server runner and server DLL build tags do not match.", L"SkyrimTogetherServer", MB_OK | MB_ICONERROR);
+#endif
         return 1;
+    }
+    SetUiLogCallback(&UiLogCallback);
 
     Base::SetCurrentThreadName("ServerRunnerMain");
 
-    LogInstance logger;
-    (void)logger;
+#ifdef _WIN32
+    if (auto* hwnd = GetConsoleWindow())
+        ShowWindow(hwnd, SW_HIDE);
+#endif
 
     // Disabled EULA check since we have no EULA contents yet
     /*
@@ -230,12 +272,37 @@ int main(int argc, char** argv)
 
     // Keep stack free.
     const auto cpRunner{std::make_unique<DediRunner>(argc, argv)};
-    if (bConsole)
-    {
-        cpRunner->StartTerminalIO();
-    }
 
-    cpRunner->RunGSThread();
+#ifdef _WIN32
+    ServerUi ui(*cpRunner);
+    if (ui.Initialize())
+    {
+#ifdef _WIN32
+        // Console input is hidden; UI handles commands.
+        std::thread serverThread([&]() {
+#if defined(_WIN32)
+            __try
+            {
+                cpRunner->RunGSThread();
+            }
+            __except (EXCEPTION_EXECUTE_HANDLER)
+            {
+            }
+#else
+            cpRunner->RunGSThread();
+#endif
+        });
+#endif
+        ui.Run();
+        serverThread.join();
+    }
+    else
+    {
+        MessageBoxW(nullptr, L"Server UI failed to initialize.", L"SkyrimTogetherServer", MB_OK | MB_ICONERROR);
+    }
+#endif
+
+    cpRunner->RequestKill();
 
     return 0;
 }

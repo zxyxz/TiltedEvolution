@@ -28,7 +28,8 @@ uint32_t Mod::GetFormId(uint32_t aBaseId) const noexcept
     return aBaseId;
 }
 
-TP_THIS_FUNCTION(TSpawnNewREFR, uint32_t&, ModManager, uint32_t& aRefHandleOut, TESForm* apBaseForm, NiPoint3* apPosition, NiPoint3* apRotation, TESObjectCELL* apParentCell, TESWorldSpace* apWorldSpace, Actor* apActor, uintptr_t a9, uintptr_t a10, char aForcePersist, char a12);
+TP_THIS_FUNCTION(TSpawnNewREFR, uint32_t&, ModManager, uint32_t& aRefHandleOut, TESForm* apBaseForm, NiPoint3* apPosition, NiPoint3* apRotation, TESObjectCELL* apParentCell, TESWorldSpace* apWorldSpace,
+                 TESObjectREFR* apAlreadyCreatedRef, uintptr_t a9, uintptr_t a10, char aForcePersist, char a12);
 TSpawnNewREFR* RealSpawnNewREFR;
 
 uint32_t& TP_MAKE_THISCALL(SpawnNewREFR, ModManager, uint32_t& aRefHandleOut, TESForm* apBaseForm, NiPoint3* apPosition, NiPoint3* apRotation, TESObjectCELL* apParentCell, TESWorldSpace* apWorldSpace, Actor* apActor, uintptr_t a9, uintptr_t a10, char aForcePersist, char a12)
@@ -43,6 +44,17 @@ uint32_t ModManager::Spawn(NiPoint3& aPosition, NiPoint3& aRotation, TESObjectCE
     uint32_t refrHandle = 0;
 
     TiltedPhoques::ThisCall(RealSpawnNewREFR, this, refrHandle, apCharacter->baseForm, &aPosition, &aRotation, apParentCell, apWorldSpace, apCharacter, 0, 0, static_cast<char>(0), static_cast<char>(1));
+
+    return refrHandle;
+}
+
+uint32_t ModManager::SpawnReference(TESForm* apBaseForm, NiPoint3& aPosition, NiPoint3& aRotation, TESObjectCELL* apParentCell, TESWorldSpace* apWorldSpace, TESObjectREFR* apAlreadyCreatedRef,
+                                    bool aForcePersist) noexcept
+{
+    uint32_t refrHandle = 0;
+
+    TiltedPhoques::ThisCall(RealSpawnNewREFR, this, refrHandle, apBaseForm, &aPosition, &aRotation, apParentCell, apWorldSpace, apAlreadyCreatedRef, 0, 0, static_cast<char>(aForcePersist ? 1 : 0),
+                            static_cast<char>(1));
 
     return refrHandle;
 }

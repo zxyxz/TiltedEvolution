@@ -31,6 +31,13 @@ declare namespace SkyrimTogetherTypes {
     sender: string,
   ) => void;
 
+  type CommandListEntry = {
+    name: string;
+    description: string;
+  };
+
+  type CommandListCallback = (commandsJson: string) => void;
+
   /** Connection callback */
   type ConnectCallback = () => void;
 
@@ -62,7 +69,10 @@ declare namespace SkyrimTogetherTypes {
     username: string,
     level: number,
     cellName: string,
+    avatar: string,
   ) => void;
+
+  type PlayerAvatarUpdatedCallback = (playerId: number, avatar: string) => void;
 
   type PlayerDisconnectedCallback = (
     playerId: number,
@@ -81,6 +91,14 @@ declare namespace SkyrimTogetherTypes {
 
   type SetLocalPlayerIdCallback = (playerId: number) => void;
 
+  /** Quest isolation / sync gating status callback */
+  type SetSyncStatusCallback = (
+    isolated: boolean,
+    title: string,
+    detail: string,
+    moreInfo?: string,
+  ) => void;
+
   type ProtocolMismatch = () => void;
 
   type TriggerError = () => void;
@@ -94,6 +112,102 @@ declare namespace SkyrimTogetherTypes {
   type PartyLeftCallback = (inviterId: number) => void;
 
   type PartyInviteReceivedCallback = (inviterId: number) => void;
+
+  /** World-map party pins payload as JSON string */
+  type SetPartyPinsCallback = (json: string) => void;
+
+  /** Death screen shown with countdown timer */
+  type ShowDeathScreenCallback = (secondsRemaining: number) => void;
+
+  /** Death screen timer update */
+  type UpdateDeathTimerCallback = (secondsRemaining: number) => void;
+
+  /** Respawn button enabled */
+  type EnableRespawnButtonCallback = () => void;
+
+  /** Death screen hidden */
+  type HideDeathScreenCallback = () => void;
+
+  /** Revive progress for the downed player */
+  type UpdateReviveVictimProgressCallback = (
+    elapsedSeconds: number,
+    totalSeconds: number,
+    healerName: string,
+  ) => void;
+
+  /** Downed revive progress stopped/reset */
+  type StopReviveVictimProgressCallback = () => void;
+
+  /** Revive progress for the healer channeling */
+  type UpdateReviveHealerProgressCallback = (
+    elapsedSeconds: number,
+    totalSeconds: number,
+  ) => void;
+
+  /** Healer revive overlay hidden */
+  type StopReviveHealerProgressCallback = () => void;
+
+  /** Teleport request received */
+  type TeleportRequestCallback = (
+    requesterId: number,
+    requesterName: string,
+  ) => void;
+
+  /** Teleport countdown update */
+  type TeleportCountdownCallback = (
+    targetPlayerId: number,
+    targetName: string,
+    secondsRemaining: number,
+    cancelled: boolean,
+    reason: string,
+  ) => void;
+
+  /** Banner notification payload */
+  type BannerCallback = (message: string, durationMs?: number) => void;
+
+  /** Emote menu open request */
+  type OpenEmoteMenuCallback = (openedFromInactive?: boolean) => void;
+  /** Emote menu toggle request */
+  type ToggleEmoteMenuCallback = () => void;
+
+  type TradeInviteCallback = (inviterId: number, expiryTick: number) => void;
+  type TradeInviteExpiredCallback = (inviterId: number) => void;
+
+  interface TradeItemPayload {
+    modId: number;
+    baseId: number;
+    count: number;
+    isQuestItem: boolean;
+    name: string;
+    inventoryIndex?: number;
+    offeredCount?: number;
+  }
+
+  interface TradeInventoryPayload extends TradeItemPayload {
+    inventoryIndex: number;
+    offeredCount: number;
+  }
+
+  type TradeStateUpdatedCallback = (
+    active: boolean,
+    partnerId: number,
+    initiatedBySelf: boolean,
+    selfReady: boolean,
+    partnerReady: boolean,
+    selfItems: TradeItemPayload[],
+    partnerItems: TradeItemPayload[],
+    inventory: TradeInventoryPayload[],
+  ) => void;
+
+  type TradeCancelledCallback = (
+    partnerId: number,
+    reason: number,
+    wasInitiator: boolean,
+  ) => void;
+
+  type TradeCompletedCallback = (partnerId: number) => void;
+
+  type TradeOfferEntry = { index: number; count: number };
 }
 
 /** Global Skyrim: Together object. */
@@ -127,6 +241,12 @@ interface SkyrimTogether {
 
   /** Add listener to when a player message is received. */
   on(event: 'message', callback: SkyrimTogetherTypes.MessageCallback): void;
+
+  /** Add listener to when the server command list is updated. */
+  on(
+    event: 'commandList',
+    callback: SkyrimTogetherTypes.CommandListCallback,
+  ): void;
 
   /** Add listener to when the player connects to a server. */
   on(event: 'connect', callback: SkyrimTogetherTypes.ConnectCallback): void;
@@ -172,6 +292,11 @@ interface SkyrimTogether {
     callback: SkyrimTogetherTypes.PlayerDisconnectedCallback,
   ): void;
 
+  on(
+    event: 'playerAvatarUpdated',
+    callback: SkyrimTogetherTypes.PlayerAvatarUpdatedCallback,
+  ): void;
+
   on(event: 'setHealth', callback: SkyrimTogetherTypes.SetHealthCallback): void;
 
   /** Add listener to when one player change level in server. */
@@ -197,6 +322,11 @@ interface SkyrimTogether {
   ): void;
 
   on(
+    event: 'setSyncStatus',
+    callback: SkyrimTogetherTypes.SetSyncStatusCallback,
+  ): void;
+
+  on(
     event: 'protocolMismatch',
     callback: SkyrimTogetherTypes.ProtocolMismatch,
   ): void;
@@ -217,6 +347,94 @@ interface SkyrimTogether {
   on(
     event: 'partyInviteReceived',
     callback: SkyrimTogetherTypes.PartyInviteReceivedCallback,
+  ): void;
+  on(
+    event: 'tradeInviteReceived',
+    callback: SkyrimTogetherTypes.TradeInviteCallback,
+  ): void;
+  on(
+    event: 'tradeInviteExpired',
+    callback: SkyrimTogetherTypes.TradeInviteExpiredCallback,
+  ): void;
+  on(
+    event: 'tradeStateUpdated',
+    callback: SkyrimTogetherTypes.TradeStateUpdatedCallback,
+  ): void;
+  on(
+    event: 'tradeCancelled',
+    callback: SkyrimTogetherTypes.TradeCancelledCallback,
+  ): void;
+  on(
+    event: 'tradeCompleted',
+    callback: SkyrimTogetherTypes.TradeCompletedCallback,
+  ): void;
+
+  on(
+    event: 'teleportRequest',
+    callback: SkyrimTogetherTypes.TeleportRequestCallback,
+  ): void;
+
+  on(
+    event: 'teleportCountdown',
+    callback: SkyrimTogetherTypes.TeleportCountdownCallback,
+  ): void;
+
+  /** Add listener to open the emote menu from native input. */
+  on(
+    event: 'openEmoteMenu',
+    callback: SkyrimTogetherTypes.OpenEmoteMenuCallback,
+  ): void;
+  /** Add listener to toggle the emote menu from native input. */
+  on(
+    event: 'toggleEmoteMenu',
+    callback: SkyrimTogetherTypes.ToggleEmoteMenuCallback,
+  ): void;
+
+  /** Add listener to transient overlay banners. */
+  on(event: 'showBanner', callback: SkyrimTogetherTypes.BannerCallback): void;
+
+  /** Add listener to when the death screen is shown. */
+  on(
+    event: 'showDeathScreen',
+    callback: SkyrimTogetherTypes.ShowDeathScreenCallback,
+  ): void;
+
+  /** Add listener to when the death screen timer updates. */
+  on(
+    event: 'updateDeathTimer',
+    callback: SkyrimTogetherTypes.UpdateDeathTimerCallback,
+  ): void;
+
+  /** Add listener to when the respawn button is enabled. */
+  on(
+    event: 'enableRespawnButton',
+    callback: SkyrimTogetherTypes.EnableRespawnButtonCallback,
+  ): void;
+
+  /** Add listener to when the death screen is hidden. */
+  on(
+    event: 'hideDeathScreen',
+    callback: SkyrimTogetherTypes.HideDeathScreenCallback,
+  ): void;
+
+  on(
+    event: 'updateReviveVictimProgress',
+    callback: SkyrimTogetherTypes.UpdateReviveVictimProgressCallback,
+  ): void;
+
+  on(
+    event: 'stopReviveVictimProgress',
+    callback: SkyrimTogetherTypes.StopReviveVictimProgressCallback,
+  ): void;
+
+  on(
+    event: 'updateReviveHealerProgress',
+    callback: SkyrimTogetherTypes.UpdateReviveHealerProgressCallback,
+  ): void;
+
+  on(
+    event: 'stopReviveHealerProgress',
+    callback: SkyrimTogetherTypes.StopReviveHealerProgressCallback,
   ): void;
 
   /** Remove listener from when the application is first initialized. */
@@ -288,6 +506,11 @@ interface SkyrimTogether {
   ): void;
 
   off(
+    event: 'playerAvatarUpdated',
+    callback?: SkyrimTogetherTypes.PlayerAvatarUpdatedCallback,
+  ): void;
+
+  off(
     event: 'userDataSet',
     callback?: SkyrimTogetherTypes.UserDataSetCallback,
   ): void;
@@ -315,6 +538,11 @@ interface SkyrimTogether {
   off(
     event: 'setLocalPlayerId',
     callback?: SkyrimTogetherTypes.SetLocalPlayerIdCallback,
+  ): void;
+
+  off(
+    event: 'setSyncStatus',
+    callback?: SkyrimTogetherTypes.SetSyncStatusCallback,
   ): void;
 
   off(
@@ -348,15 +576,111 @@ interface SkyrimTogether {
     event: 'partyInviteReceived',
     callback?: SkyrimTogetherTypes.PartyInviteReceivedCallback,
   ): void;
+  off(
+    event: 'tradeInviteReceived',
+    callback?: SkyrimTogetherTypes.TradeInviteCallback,
+  ): void;
+  off(
+    event: 'tradeInviteExpired',
+    callback?: SkyrimTogetherTypes.TradeInviteExpiredCallback,
+  ): void;
+  off(
+    event: 'tradeStateUpdated',
+    callback?: SkyrimTogetherTypes.TradeStateUpdatedCallback,
+  ): void;
+  off(
+    event: 'tradeCancelled',
+    callback?: SkyrimTogetherTypes.TradeCancelledCallback,
+  ): void;
+  off(
+    event: 'tradeCompleted',
+    callback?: SkyrimTogetherTypes.TradeCompletedCallback,
+  ): void;
+
+  off(
+    event: 'teleportRequest',
+    callback?: SkyrimTogetherTypes.TeleportRequestCallback,
+  ): void;
+
+  off(
+    event: 'teleportCountdown',
+    callback?: SkyrimTogetherTypes.TeleportCountdownCallback,
+  ): void;
+
+  /** Remove listener from emote menu open requests. */
+  off(
+    event: 'openEmoteMenu',
+    callback?: SkyrimTogetherTypes.OpenEmoteMenuCallback,
+  ): void;
+  /** Remove listener from emote menu toggle requests. */
+  off(
+    event: 'toggleEmoteMenu',
+    callback?: SkyrimTogetherTypes.ToggleEmoteMenuCallback,
+  ): void;
+
+  /** Remove listener from overlay banners. */
+  off(event: 'showBanner', callback?: SkyrimTogetherTypes.BannerCallback): void;
+
+  /** Remove listener from when the death screen is shown. */
+  off(
+    event: 'showDeathScreen',
+    callback?: SkyrimTogetherTypes.ShowDeathScreenCallback,
+  ): void;
+
+  /** Remove listener from when the death screen timer updates. */
+  off(
+    event: 'updateDeathTimer',
+    callback?: SkyrimTogetherTypes.UpdateDeathTimerCallback,
+  ): void;
+
+  /** Remove listener from when the respawn button is enabled. */
+  off(
+    event: 'enableRespawnButton',
+    callback?: SkyrimTogetherTypes.EnableRespawnButtonCallback,
+  ): void;
+
+  /** Remove listener from when the death screen is hidden. */
+  off(
+    event: 'hideDeathScreen',
+    callback?: SkyrimTogetherTypes.HideDeathScreenCallback,
+  ): void;
+
+  off(
+    event: 'updateReviveVictimProgress',
+    callback?: SkyrimTogetherTypes.UpdateReviveVictimProgressCallback,
+  ): void;
+
+  off(
+    event: 'stopReviveVictimProgress',
+    callback?: SkyrimTogetherTypes.StopReviveVictimProgressCallback,
+  ): void;
+
+  off(
+    event: 'updateReviveHealerProgress',
+    callback?: SkyrimTogetherTypes.UpdateReviveHealerProgressCallback,
+  ): void;
+
+  off(
+    event: 'stopReviveHealerProgress',
+    callback?: SkyrimTogetherTypes.StopReviveHealerProgressCallback,
+  ): void;
 
   /**
    * Connect to server at given address and port.
    *
    * @param host IP address or hostname.
    * @param port Port.
-   * @param password Server password.
+   * @param username Account username.
+   * @param password Account password.
+   * @param serverPassword Optional legacy server password.
    */
-  connect(host: string, port: number, password: string): void;
+  connect(
+    host: string,
+    port: number,
+    username: string,
+    password: string,
+    serverPassword?: string,
+  ): void;
 
   /**
    * Disconnect from server or cancel connection.
@@ -367,6 +691,13 @@ interface SkyrimTogether {
    * Reveal other players in the immediate area.
    */
   revealPlayers(): void;
+
+  /**
+   * Trigger a pre-defined emote animation on the local player.
+   *
+   * @param eventName Animation graph event to fire.
+   */
+  playEmote(eventName: string): void;
 
   /**
    * Send message to server.
@@ -384,11 +715,19 @@ interface SkyrimTogether {
   deactivate(): void;
 
   /**
-   * Teleport to given player
+   * Request teleportation to a given player.
    *
-   * @param playerId Id of the player to which the requester should be teleported to
+   * @param playerId Id of the player to whom the request should be sent.
    */
   teleportToPlayer(playerId: number): void;
+
+  /**
+   * Respond to an incoming teleport request.
+   *
+   * @param requesterId Id of the player that issued the request.
+   * @param accepted Whether the request is accepted.
+   */
+  respondTeleportRequest(requesterId: number, accepted: boolean): void;
 
   /**
    * Reconnect the client.
@@ -432,4 +771,57 @@ interface SkyrimTogether {
    * @param playerId Id of the new leader.
    */
   changePartyLeader(playerId: number): void;
+
+  /**
+   * Send a trade invite to another player.
+   *
+   * @param playerId Id of the player to trade with.
+   */
+  sendTradeInvite(playerId: number): void;
+
+  /**
+   * Respond to a trade invite.
+   *
+   * @param playerId Id of the inviter.
+   * @param accept Whether to accept the invitation.
+   */
+  respondTradeInvite(playerId: number, accept: boolean): void;
+
+  /**
+   * Cancel the current trade session or pending invite.
+   */
+  cancelTrade(): void;
+
+  /**
+   * Update the local ready state for the current trade session.
+   *
+   * @param ready Whether the player is ready to finalize the trade.
+   */
+  setTradeReady(ready: boolean): void;
+
+  /**
+   * Update the items offered in the current trade session.
+   *
+   * @param entries Selection of inventory indices and counts to offer.
+   */
+  updateTradeOffer(entries: SkyrimTogetherTypes.TradeOfferEntry[]): void;
+
+  /**
+   * Upload or clear the local profile picture shown to party members.
+   *
+   * @param imageData Data URL (e.g. "data:image/png;base64,...") or empty string to clear.
+   */
+  setProfilePicture(imageData: string): void;
+
+  /**
+   * Select how player name tags are rendered in the world.
+   *
+   * @param mode Numeric representation of the desired nametag display mode.
+   */
+  setNameTagMode(mode: number): void;
+
+  /**
+   * Called when the player clicks the respawn button on the death screen.
+   */
+  respawnButtonClicked(): void;
 }

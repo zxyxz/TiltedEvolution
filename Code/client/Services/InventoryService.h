@@ -1,14 +1,16 @@
 #pragma once
 
+#include <cstdint>
+
 struct World;
 struct TransportService;
+class Actor;
 
-struct UpdateEvent;
-struct NotifyObjectInventoryChanges;
-struct NotifyInventoryChanges;
-struct InventoryChangeEvent;
-struct EquipmentChangeEvent;
-struct NotifyEquipmentChanges;
+#include <Events/EquipmentChangeEvent.h>
+#include <Events/InventoryChangeEvent.h>
+#include <Messages/NotifyInventoryChanges.h>
+#include <Messages/NotifyEquipmentChanges.h>
+#include <Events/UpdateEvent.h>
 
 /**
  * @brief Manages inventories of actors and containers.
@@ -51,6 +53,22 @@ struct InventoryService
     void OnNotifyEquipmentChanges(const NotifyEquipmentChanges& acMessage) noexcept;
 
 private:
+    void ApplyEquipmentChange(Actor* pActor, const NotifyEquipmentChanges& acMessage) noexcept;
+    void ProcessPendingEquipment() noexcept;
+    void ProcessPendingEquipmentChanges() noexcept;
+    void ProcessPendingEquipmentRequests() noexcept;
+    void ProcessPendingInventoryChanges() noexcept;
+    bool SendEquipmentChange(const EquipmentChangeEvent& acEvent) noexcept;
+    enum class ActorReadinessStatus : uint8_t
+    {
+        Ready,
+        MissingActor,
+        Missing3D,
+        MissingContainerData
+    };
+    ActorReadinessStatus EvaluateActorReadiness(Actor* pActor) const noexcept;
+    static const char* DescribeReadiness(ActorReadinessStatus aStatus) noexcept;
+
     /**
      * Checks whether local actors their weapon draw states have changed,
      * and if so, send the new states to the server.
@@ -62,6 +80,9 @@ private:
     */
     void RunNakedNPCBugChecks() noexcept;
 
+    bool TryApplyInventoryChange(const NotifyInventoryChanges& acMessage) noexcept;
+    bool TryApplyEquipmentChange(const NotifyEquipmentChanges& acMessage) noexcept;
+
     World& m_world;
     entt::dispatcher& m_dispatcher;
     TransportService& m_transport;
@@ -71,4 +92,8 @@ private:
     entt::scoped_connection m_equipmentConnection;
     entt::scoped_connection m_inventoryChangeConnection;
     entt::scoped_connection m_equipmentChangeConnection;
+
+    TiltedPhoques::Vector<EquipmentChangeEvent> m_pendingEquipmentRequests;
+    TiltedPhoques::Vector<NotifyEquipmentChanges> m_pendingEquipmentChanges;
+    TiltedPhoques::Vector<NotifyInventoryChanges> m_pendingInventoryChanges;
 };

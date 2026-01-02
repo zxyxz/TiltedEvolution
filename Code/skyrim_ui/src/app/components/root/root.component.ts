@@ -19,7 +19,7 @@ import { controlsAnimation } from './controls.animation';
 import { notificationsAnimation } from './notifications.animation';
 import { map } from 'rxjs/operators';
 
-const REVEAL_EFFECT_DURATION_MS = 10000 // todo: pass value from C++?
+const REVEAL_EFFECT_DURATION_MS = 10000; // todo: pass value from C++?
 
 @Component({
   selector: 'app-root',
@@ -43,7 +43,8 @@ export class RootComponent implements OnInit {
   menuOpen$ = this.client.openingMenuChange.asObservable();
   inGame$ = this.client.inGameStateChange.asObservable();
   active$ = this.client.activationStateChange.asObservable();
-  connectionInProgress$ = this.client.isConnectionInProgressChange.asObservable();
+  connectionInProgress$ =
+    this.client.isConnectionInProgressChange.asObservable();
   revealingInProgress$ = false;
 
   @ViewChild('chat') private chatComp!: ChatComponent;
@@ -67,6 +68,7 @@ export class RootComponent implements OnInit {
     this.onInGameStateSubscription();
     this.onActivationStateSubscription();
     this.onFontSizeSubscription();
+    this.onConnectionStateSubscription();
   }
 
   public onInGameStateSubscription() {
@@ -107,6 +109,23 @@ export class RootComponent implements OnInit {
       });
   }
 
+  public onConnectionStateSubscription() {
+    this.client.connectionStateChange
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(state => {
+        if (!state) {
+          const currentView = this.uiRepository.getView();
+          if (
+            currentView === null ||
+            currentView === View.DISCONNECT ||
+            currentView === View.RECONNECT
+          ) {
+            this.setView(View.CONNECT);
+          }
+        }
+      });
+  }
+
   public setView(view: View | null) {
     this.uiRepository.openView(view);
 
@@ -125,12 +144,17 @@ export class RootComponent implements OnInit {
     this.client.reconnect();
   }
 
+  public openEmoteWheel(): void {
+    this.setView(this.RootView.EMOTES);
+  }
+
   public revealPlayers(): void {
-    if (this.revealingInProgress$)
-      return;
+    if (this.revealingInProgress$) return;
 
     this.revealingInProgress$ = true;
-    setTimeout(() => { this.revealingInProgress$ = false }, REVEAL_EFFECT_DURATION_MS);
+    setTimeout(() => {
+      this.revealingInProgress$ = false;
+    }, REVEAL_EFFECT_DURATION_MS);
 
     this.sound.play(Sound.Focus);
     this.client.revealPlayers();

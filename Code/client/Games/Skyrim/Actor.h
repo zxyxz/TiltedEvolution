@@ -3,6 +3,8 @@
 #include <Games/Events.h>
 #include <TESObjectREFR.h>
 
+#include <optional>
+
 #include <Magic/MagicTarget.h>
 #include <Forms/TESActorBase.h>
 #include <Misc/ActorState.h>
@@ -22,6 +24,7 @@ struct ActorExtension;
 struct AIProcess;
 struct CombatController;
 struct TESIdleForm;
+struct SpellItem;
 
 struct Actor : TESObjectREFR
 {
@@ -229,6 +232,7 @@ struct Actor : TESObjectREFR
     void SetNoBleedoutRecovery(bool aSet) noexcept;
     void SetPlayerRespawnMode(bool aSet = true) noexcept;
     void SetPlayerTeammate(bool aSet) noexcept;
+    bool HasLineOfSight(TESObjectREFR* apTarget) noexcept;
 
     // Actions
     void UnEquipAll() noexcept;
@@ -236,13 +240,14 @@ struct Actor : TESObjectREFR
     void QueueUpdate() noexcept;
     bool InitiateMountPackage(Actor* apMount) noexcept;
     void GenerateMagicCasters() noexcept;
+
     void DispelAllSpells(bool aNow = false) noexcept;
     void Reset() noexcept;
     void Kill() noexcept;
     void Respawn() noexcept;
     void PickUpObject(TESObjectREFR* apObject, int32_t aCount, bool aUnk1, float aUnk2) noexcept;
-    void DropObject(TESBoundObject* apObject, ExtraDataList* apExtraData, int32_t aCount, NiPoint3* apLocation, NiPoint3* apRotation) noexcept;
     void DropOrPickUpObject(const Inventory::Entry& arEntry, NiPoint3* apPoint, NiPoint3* apRotate) noexcept;
+    void DropObject(TESBoundObject* apObject, ExtraDataList* apExtraData, int32_t aCount, NiPoint3* apLocation, NiPoint3* apRotation) noexcept;
     void SpeakSound(const char* pFile);
     void StartCombatEx(Actor* apTarget) noexcept;
     void SetCombatTargetEx(Actor* apTarget) noexcept;
@@ -366,7 +371,6 @@ public:
 };
 
 static_assert(offsetof(Actor, currentProcess) == 0xF8);
-static_assert(offsetof(Actor, flags1) == 0xE8);
 static_assert(offsetof(Actor, actorValueOwner) == 0xB8);
 static_assert(offsetof(Actor, actorState) == 0xC0);
 static_assert(offsetof(Actor, flags2) == 0x204);

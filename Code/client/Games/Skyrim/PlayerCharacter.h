@@ -120,6 +120,8 @@ struct PlayerCharacter : Actor
 
     void SetWaypoint(NiPoint3* apPosition, TESWorldSpace* apWorldSpace) noexcept;
     void RemoveWaypoint() noexcept;
+    GameArray<BSPointerHandle<TESObjectREFR>>* GetCurrentMapMarkers() noexcept;
+    const GameArray<BSPointerHandle<TESObjectREFR>>* GetCurrentMapMarkers() const noexcept;
 
     struct Objective
     {

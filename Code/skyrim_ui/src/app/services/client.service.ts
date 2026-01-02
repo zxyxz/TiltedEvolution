@@ -5,9 +5,63 @@ import { environment } from '../../environments/environment';
 import { Debug } from '../models/debug';
 import { PartyInfo } from '../models/party-info';
 import { Player } from '../models/player';
+import { View } from '../models/view.enum';
 import { ChatService } from './chat.service';
 import { ErrorEvents, ErrorService } from './error.service';
 import { LoadingService } from './loading.service';
+import { PartyPin } from '../models/party-pin';
+import { UiRepository } from '../store/ui.repository';
+import { OverlayBannerService } from './overlay-banner.service';
+
+export interface TradeItemPayload {
+  modId: number;
+  baseId: number;
+  count: number;
+  isQuestItem: boolean;
+  name: string;
+  inventoryIndex?: number;
+  offeredCount?: number;
+  isGold?: boolean;
+  details?: string[];
+  raw?: any;
+}
+
+export interface TradeStatePayload {
+  active: boolean;
+  partnerId: number;
+  initiatedBySelf: boolean;
+  selfReady: boolean;
+  partnerReady: boolean;
+  selfItems: TradeItemPayload[];
+  partnerItems: TradeItemPayload[];
+  inventory: TradeItemPayload[];
+  countdownMs: number;
+  countdownTotalMs: number;
+}
+
+export interface TradeInvitePayload {
+  inviterId: number;
+  expiryTick: number;
+}
+
+export interface TradeCancellationPayload {
+  partnerId: number;
+  reason: number;
+  wasInitiator: boolean;
+}
+
+export interface ReviveProgressPayload {
+  elapsedSeconds: number;
+  totalSeconds: number;
+  label?: string;
+}
+
+export interface SyncStatusPayload {
+  isolated: boolean;
+  title: string;
+  detail: string;
+  moreInfo: string;
+}
 
 /** Client game service. */
 @Injectable({
@@ -31,6 +85,14 @@ export class ClientService implements OnDestroy {
 
   public isConnectionInProgressChange = new BehaviorSubject(false);
 
+  /** Quest isolation / sync gating status. */
+  public syncStatusChange = new BehaviorSubject<SyncStatusPayload>({
+    isolated: false,
+    title: '',
+    detail: '',
+    moreInfo: '',
+  });
+
   /** Player name change. */
   public nameChange = new BehaviorSubject(environment.game ? '' : 'test');
 
@@ -52,8 +114,31 @@ export class ClientService implements OnDestroy {
   /** Connect party info change. */
   public partyLeftChange = new Subject<void>();
 
+  /** Party pins for world map overlay. */
+  public partyPinsChange = new BehaviorSubject<PartyPin[]>([]);
+
   /** Connect party invite received. */
   public partyInviteReceivedChange = new Subject<number>();
+
+  /** Trade invite received. */
+  public tradeInviteChange = new Subject<TradeInvitePayload>();
+
+  /** Trade invite expired. */
+  public tradeInviteExpiredChange = new Subject<number>();
+
+  /** Active trade state change. */
+  public tradeStateChange = new BehaviorSubject<TradeStatePayload | undefined>(
+    undefined,
+  );
+
+  /** Trade cancellation notifications. */
+  public tradeCancelledChange = new Subject<TradeCancellationPayload>();
+
+  /** Trade completion notifications. */
+  public tradeCompletedChange = new Subject<number>();
+
+  /** Player avatar update. */
+  public avatarChange = new Subject<Player>();
 
   /** Disconnect player to server change. */
   public playerDisconnectedChange = new Subject<Player>();
@@ -78,6 +163,18 @@ export class ClientService implements OnDestroy {
   /** Used purely for debugging. */
   public debugChange = new Subject<void>();
 
+  /** Teleport request received. */
+  public teleportRequestChange = new Subject<{
+    requesterId: number;
+    requesterName: string;
+  }>();
+
+  /** Teleport request handled. */
+  public teleportRequestHandledChange = new Subject<{
+    requesterId: number;
+    accepted: boolean;
+  }>();
+
   // The below emitters are used in the mocking service
 
   /** Used for when a party leader changed. */
@@ -95,13 +192,42 @@ export class ClientService implements OnDestroy {
   /** Used for when a party leader changed. */
   public partyLeaderChange = new Subject<number>();
 
+  /** Death screen shown with countdown. */
+  public deathScreenChange = new Subject<number>();
+
+  /** Death screen timer update. */
+  public deathTimerChange = new Subject<number>();
+
+  /** Respawn button enabled. */
+  public respawnButtonEnabledChange = new Subject<void>();
+
+  /** Death screen hidden. */
+  public deathScreenHiddenChange = new Subject<void>();
+
+  /** Revive progress updates for the downed player. */
+  public reviveVictimProgressChange = new BehaviorSubject<
+    ReviveProgressPayload | undefined
+  >(undefined);
+
+  /** Revive progress updates for the healer. */
+  public reviveHealerProgressChange = new BehaviorSubject<
+    ReviveProgressPayload | undefined
+  >(undefined);
+
   public localPlayerId = undefined;
+  public localPlayerIdChange = new BehaviorSubject<number | undefined>(
+    undefined,
+  );
 
-  private _host: string;
+  private _host = '';
 
-  private _port: number;
+  private _port = 0;
 
-  private _password: string;
+  private _username = '';
+
+  private _password = '';
+
+  private _serverPassword = '';
 
   private _remainingReconnectionAttempt = environment.nbReconnectionAttempts;
 
@@ -114,6 +240,8 @@ export class ClientService implements OnDestroy {
     private readonly loadingService: LoadingService,
     private readonly translocoService: TranslocoService,
     private readonly chatService: ChatService,
+    private readonly uiRepository: UiRepository,
+    private readonly overlayBannerService: OverlayBannerService,
   ) {
     skyrimtogether.on('init', this.onInit.bind(this));
     skyrimtogether.on('activate', this.onActivate.bind(this));
@@ -132,6 +260,7 @@ export class ClientService implements OnDestroy {
       'playerDisconnected',
       this.onPlayerDisconnected.bind(this),
     );
+    skyrimtogether.on('playerAvatarUpdated', this.onPlayerAvatar.bind(this));
     skyrimtogether.on('setHealth', this.onSetHealth.bind(this));
     skyrimtogether.on('setLevel', this.onSetLevel.bind(this));
     skyrimtogether.on('setCell', this.onSetCell.bind(this));
@@ -141,15 +270,62 @@ export class ClientService implements OnDestroy {
       this.onSetPlayer3dUnloaded.bind(this),
     );
     skyrimtogether.on('setLocalPlayerId', this.onSetLocalPlayerId.bind(this));
+    (skyrimtogether as any).on(
+      'setSyncStatus',
+      this.onSetSyncStatus.bind(this),
+    );
     skyrimtogether.on('protocolMismatch', this.onProtocolMismatch.bind(this));
     skyrimtogether.on('triggerError', this.onTriggerError.bind(this));
     skyrimtogether.on('dummyData', this.onDummyData.bind(this));
     skyrimtogether.on('partyInfo', this.onPartyInfo.bind(this));
+    skyrimtogether.on('teleportRequest', this.onTeleportRequest.bind(this));
+    skyrimtogether.on('teleportCountdown', this.onTeleportCountdown.bind(this));
     skyrimtogether.on('partyCreated', this.onPartyCreated.bind(this));
     skyrimtogether.on('partyLeft', this.onPartyLeft.bind(this));
     skyrimtogether.on(
       'partyInviteReceived',
       this.onPartyInviteReceived.bind(this),
+    );
+    skyrimtogether.on(
+      'tradeInviteReceived',
+      this.onTradeInviteReceived.bind(this),
+    );
+    skyrimtogether.on(
+      'tradeInviteExpired',
+      this.onTradeInviteExpired.bind(this),
+    );
+    skyrimtogether.on('tradeStateUpdated', this.onTradeStateUpdated.bind(this));
+    skyrimtogether.on('tradeCancelled', this.onTradeCancelled.bind(this));
+    skyrimtogether.on('tradeCompleted', this.onTradeCompleted.bind(this));
+    (skyrimtogether as any).on('setPartyPins', this.onSetPartyPins.bind(this));
+    skyrimtogether.on('showDeathScreen', this.onShowDeathScreen.bind(this));
+    skyrimtogether.on('updateDeathTimer', this.onUpdateDeathTimer.bind(this));
+    skyrimtogether.on(
+      'enableRespawnButton',
+      this.onEnableRespawnButton.bind(this),
+    );
+    skyrimtogether.on('hideDeathScreen', this.onHideDeathScreen.bind(this));
+    skyrimtogether.on(
+      'updateReviveVictimProgress',
+      this.onUpdateReviveVictimProgress.bind(this),
+    );
+    skyrimtogether.on(
+      'stopReviveVictimProgress',
+      this.onStopReviveVictimProgress.bind(this),
+    );
+    skyrimtogether.on(
+      'updateReviveHealerProgress',
+      this.onUpdateReviveHealerProgress.bind(this),
+    );
+    skyrimtogether.on(
+      'stopReviveHealerProgress',
+      this.onStopReviveHealerProgress.bind(this),
+    );
+    skyrimtogether.on('showBanner', this.onShowBanner.bind(this));
+    skyrimtogether.on('openEmoteMenu', this.onOpenEmoteMenu.bind(this));
+    (skyrimtogether as any).on(
+      'toggleEmoteMenu',
+      this.onToggleEmoteMenu.bind(this),
     );
   }
 
@@ -171,19 +347,40 @@ export class ClientService implements OnDestroy {
     skyrimtogether.off('debugData');
     skyrimtogether.off('playerConnected');
     skyrimtogether.off('playerDisconnected');
+    skyrimtogether.off('playerAvatarUpdated');
     skyrimtogether.off('setHealth');
     skyrimtogether.off('setLevel');
     skyrimtogether.off('setCell');
     skyrimtogether.off('setPlayer3dLoaded');
     skyrimtogether.off('setPlayer3dUnloaded');
     skyrimtogether.off('setLocalPlayerId');
+    skyrimtogether.off('setSyncStatus');
     skyrimtogether.off('protocolMismatch');
     skyrimtogether.off('triggerError');
     skyrimtogether.off('dummyData');
     skyrimtogether.off('partyInfo');
+    skyrimtogether.off('teleportRequest');
+    skyrimtogether.off('teleportCountdown');
     skyrimtogether.off('partyCreated');
     skyrimtogether.off('partyLeft');
     skyrimtogether.off('partyInviteReceived');
+    skyrimtogether.off('tradeInviteReceived');
+    skyrimtogether.off('tradeInviteExpired');
+    skyrimtogether.off('tradeStateUpdated');
+    skyrimtogether.off('tradeCancelled');
+    skyrimtogether.off('tradeCompleted');
+    (skyrimtogether as any).off('setPartyPins');
+    skyrimtogether.off('showBanner');
+    skyrimtogether.off('openEmoteMenu');
+    (skyrimtogether as any).off('toggleEmoteMenu');
+    skyrimtogether.off('showDeathScreen');
+    skyrimtogether.off('updateDeathTimer');
+    skyrimtogether.off('enableRespawnButton');
+    skyrimtogether.off('hideDeathScreen');
+    skyrimtogether.off('updateReviveVictimProgress');
+    skyrimtogether.off('stopReviveVictimProgress');
+    skyrimtogether.off('updateReviveHealerProgress');
+    skyrimtogether.off('stopReviveHealerProgress');
   }
 
   /**
@@ -191,14 +388,34 @@ export class ClientService implements OnDestroy {
    *
    * @param host IP address or hostname.
    * @param port Port.
-   * @param password Password or admin password
+   * @param username Account username used for server-side authentication.
+   * @param password Account password used for server-side authentication.
+   * @param serverPassword Optional legacy server password/admin token.
    */
-  public connect(host: string, port: number, password = ''): void {
-    skyrimtogether.connect(host, port, password);
+  public connect(
+    host: string,
+    port: number,
+    username: string,
+    password: string,
+    serverPassword = '',
+  ): void {
+    if (serverPassword && serverPassword.length > 0) {
+      skyrimtogether.connect(host, port, username, password, serverPassword);
+    } else {
+      skyrimtogether.connect(host, port, username, password);
+    }
     this.isConnectionInProgressChange.next(true);
     this._host = host;
     this._port = port;
+    this._username = username;
     this._password = password;
+    this._serverPassword = serverPassword;
+
+    if (username && username.length > 0) {
+      this.zone.run(() => {
+        this.nameChange.next(username);
+      });
+    }
   }
 
   /**
@@ -214,6 +431,16 @@ export class ClientService implements OnDestroy {
    */
   public revealPlayers(): void {
     skyrimtogether.revealPlayers();
+  }
+
+  /**
+   * Trigger an emote animation locally (and sync it to other players).
+   */
+  public playEmote(eventName: string): void {
+    if (!eventName) {
+      return;
+    }
+    skyrimtogether.playEmote(eventName);
   }
 
   /**
@@ -258,6 +485,36 @@ export class ClientService implements OnDestroy {
     skyrimtogether.changePartyLeader(playerId);
   }
 
+  /** Send a trade invite to another player. */
+  public sendTradeInvite(playerId: number): void {
+    skyrimtogether.sendTradeInvite(playerId);
+  }
+
+  /** Respond to an incoming trade invite. */
+  public respondTradeInvite(playerId: number, accept: boolean): void {
+    skyrimtogether.respondTradeInvite(playerId, accept);
+  }
+
+  /** Cancel the current trade session or outstanding invite. */
+  public cancelTrade(): void {
+    skyrimtogether.cancelTrade();
+  }
+
+  /** Toggle readiness state in the current trade session. */
+  public setTradeReady(ready: boolean): void {
+    skyrimtogether.setTradeReady(ready);
+  }
+
+  /** Update the offered items for the current trade session. */
+  public updateTradeOffer(entries: { index: number; count: number }[]): void {
+    skyrimtogether.updateTradeOffer(entries);
+  }
+
+  /** Upload or clear the local profile picture. */
+  public setProfilePicture(imageData: string): void {
+    skyrimtogether.setProfilePicture(imageData);
+  }
+
   /**
    * Deactivate UI and release control.
    */
@@ -273,8 +530,30 @@ export class ClientService implements OnDestroy {
     this._remainingReconnectionAttempt = 0;
   }
 
-  public teleportToPlayer(playerId: number): void {
+  /**
+   * Request teleportation to another player.
+   *
+   * @param playerId Target player identifier.
+   */
+  public requestTeleport(playerId: number): void {
     skyrimtogether.teleportToPlayer(playerId);
+  }
+
+  /**
+   * Respond to an incoming teleport request.
+   *
+   * @param requesterId Requesting player's identifier.
+   * @param accepted Whether the request is accepted.
+   */
+  public respondTeleportRequest(requesterId: number, accepted: boolean): void {
+    skyrimtogether.respondTeleportRequest(requesterId, accepted);
+    this.zone.run(() => {
+      this.teleportRequestHandledChange.next({ requesterId, accepted });
+    });
+  }
+
+  public teleportToPlayer(playerId: number): void {
+    this.requestTeleport(playerId);
   }
 
   /**
@@ -353,13 +632,26 @@ export class ClientService implements OnDestroy {
   private onDisconnect(isError: boolean): void {
     void this.zone.run(async () => {
       this.localPlayerId = undefined;
+      this.localPlayerIdChange.next(undefined);
       this.connectionStateChange.next(false);
       this.isConnectionInProgressChange.next(false);
+      this.syncStatusChange.next({
+        isolated: false,
+        title: '',
+        detail: '',
+        moreInfo: '',
+      });
 
       if (isError && this._remainingReconnectionAttempt > 0) {
         this._remainingReconnectionAttempt--;
         this.chatService.pushSystemMessage('SERVICE.CLIENT.CONNECTION_LOST');
-        this.connect(this._host, this._port, this._password);
+        this.connect(
+          this._host,
+          this._port,
+          this._username ?? '',
+          this._password ?? '',
+          this._serverPassword ?? '',
+        );
       } else {
         this.chatService.pushSystemMessage('SERVICE.CLIENT.DISCONNECTED');
       }
@@ -373,7 +665,9 @@ export class ClientService implements OnDestroy {
    */
   private onSetName(name: string): void {
     this.zone.run(() => {
-      this.nameChange.next(name);
+      const effectiveName =
+        this._username && this._username.length > 0 ? this._username : name;
+      this.nameChange.next(effectiveName);
     });
   }
 
@@ -430,6 +724,7 @@ export class ClientService implements OnDestroy {
     username: string,
     level: number,
     cellName: string,
+    avatar: string,
   ) {
     if (environment.game) {
       console.log(
@@ -446,6 +741,7 @@ export class ClientService implements OnDestroy {
           connected: true,
           level: level,
           cellName: cellName,
+          avatar: avatar,
         }),
       );
     });
@@ -465,6 +761,24 @@ export class ClientService implements OnDestroy {
           name: username,
           id: playerId,
           connected: false,
+        }),
+      );
+    });
+  }
+
+  private onPlayerAvatar(playerId: number, avatar: string) {
+    if (environment.game) {
+      console.log(
+        `%conPlayerAvatar`,
+        'background: #009688; color: #fff; padding: 3px; font-size: 9px;',
+        ...Array.from(arguments).map(v => JSON.stringify(v)),
+      );
+    }
+    this.zone.run(() => {
+      this.avatarChange.next(
+        new Player({
+          id: playerId,
+          avatar: avatar,
         }),
       );
     });
@@ -540,6 +854,23 @@ export class ClientService implements OnDestroy {
     }
     this.zone.run(() => {
       this.localPlayerId = playerId;
+      this.localPlayerIdChange.next(playerId);
+    });
+  }
+
+  private onSetSyncStatus(
+    isolated: boolean,
+    title: string,
+    detail: string,
+    moreInfo?: string,
+  ) {
+    this.zone.run(() => {
+      this.syncStatusChange.next({
+        isolated,
+        title,
+        detail,
+        moreInfo: moreInfo || '',
+      });
     });
   }
 
@@ -553,7 +884,68 @@ export class ClientService implements OnDestroy {
     this.zone.run(() => {
       const error = JSON.parse(rawError) as ErrorEvents;
       this.triggerError.next(error);
+      if (error.error === 'wrong_server_password' && this._host) {
+        this._serverPassword = '';
+        const currentView = this.uiRepository.getView();
+        const defaultReturnView =
+          currentView === View.SERVER_LIST ? View.SERVER_LIST : View.CONNECT;
+        const storedReturnView = this.uiRepository.getConnectReturnView();
+        const returnView =
+          currentView === View.CONNECT
+            ? defaultReturnView
+            : storedReturnView ?? defaultReturnView;
+        const storedName = this.uiRepository.getConnectName();
+        const connectName =
+          storedName && storedName.length > 0 ? storedName : this._host;
+        this.uiRepository.openConnectWithPasswordView(
+          this._host,
+          this._port,
+          connectName,
+          returnView,
+          this._username,
+          this._password,
+        );
+      } else if (error.error === 'wrong_account_password') {
+        this.uiRepository.openView(View.CONNECT);
+      } else if (error.error === 'duplicate_user') {
+        this.uiRepository.openView(View.CONNECT);
+      }
       void this.errorService.setError(error);
+    });
+  }
+
+  private emoteOpenedFromInactive = false;
+
+  private onOpenEmoteMenu(openedFromInactive?: boolean) {
+    this.emoteOpenedFromInactive = !!openedFromInactive;
+    this.zone.run(() => {
+      this.activationStateChange.next(true);
+      this.uiRepository.openView(View.EMOTES);
+    });
+  }
+
+  private onToggleEmoteMenu() {
+    this.zone.run(() => {
+      const currentView = this.uiRepository.getView();
+      if (currentView === View.EMOTES) {
+        this.uiRepository.closeView();
+        if (this.emoteOpenedFromInactive) {
+          this.emoteOpenedFromInactive = false;
+          this.deactivate();
+        }
+      }
+    });
+  }
+
+  private onShowBanner(message: string, durationMs?: number) {
+    this.zone.run(() => {
+      this.overlayBannerService.show(
+        {
+          primary: message,
+          tone: 'info',
+        },
+        durationMs && durationMs > 0 ? durationMs : undefined,
+      );
     });
   }
 
@@ -619,6 +1011,98 @@ export class ClientService implements OnDestroy {
     });
   }
 
+  private onTeleportRequest(requesterId: number, requesterName: string): void {
+    this.zone.run(() => {
+      this.teleportRequestChange.next({ requesterId, requesterName });
+    });
+  }
+
+  private onTeleportCountdown(
+    targetPlayerId: number,
+    targetName: string,
+    secondsRemaining: number,
+    cancelled: boolean,
+    reason: string,
+  ): void {
+    if (environment.game) {
+      console.log(
+        `%conTeleportCountdown`,
+        'background: #3f51b5; color: #fff; padding: 3px; font-size: 9px;',
+        targetPlayerId,
+        targetName,
+        secondsRemaining,
+        cancelled,
+        reason,
+      );
+    }
+
+    this.zone.run(() => {
+      if (cancelled) {
+        if (reason && reason.length > 0) {
+          this.overlayBannerService.show(
+            {
+              primary: reason,
+              tone: 'error',
+            },
+            4000,
+          );
+        } else {
+          this.overlayBannerService.hide();
+        }
+        return;
+      }
+
+      const safeSeconds = Math.max(0, secondsRemaining);
+      const primary = this.translocoService.translate(
+        'SERVICE.OVERLAY_BANNER.TELEPORT_COUNTDOWN_TITLE',
+        { name: targetName },
+      );
+      const secondary = this.translocoService.translate(
+        'SERVICE.OVERLAY_BANNER.TELEPORT_COUNTDOWN_SUBTITLE',
+        { seconds: safeSeconds },
+      );
+      this.overlayBannerService.show({
+        primary,
+        secondary,
+        tone: 'info',
+      });
+    });
+  }
+
+  private onSetPartyPins(json: string) {
+    try {
+      const pins = JSON.parse(json) as Array<{
+        x: unknown;
+        y: unknown;
+        id: unknown;
+        oob?: unknown;
+        name?: unknown;
+        avatar?: unknown;
+      }>;
+      const normalized = pins.map(pin => {
+        const asNumber = (value: unknown) => {
+          if (typeof value === 'number') {
+            return value;
+          }
+          const parsed = Number(value);
+          return Number.isFinite(parsed) ? parsed : 0;
+        };
+
+        return {
+          x: asNumber(pin.x),
+          y: asNumber(pin.y),
+          id: Math.trunc(asNumber(pin.id)),
+          oob: Boolean(pin.oob),
+          name: typeof pin.name === 'string' ? pin.name : undefined,
+          avatar: typeof pin.avatar === 'string' ? pin.avatar : undefined,
+        };
+      });
+      this.zone.run(() => this.partyPinsChange.next(normalized));
+    } catch (e) {
+      // ignore invalid payloads
+    }
+  }
+
   private onPartyInviteReceived(inviterId: number) {
     if (environment.game) {
       console.log(
@@ -630,5 +1114,305 @@ export class ClientService implements OnDestroy {
     this.zone.run(() => {
       this.partyInviteReceivedChange.next(inviterId);
     });
+  }
+
+  private onTradeInviteReceived(inviterId: number, expiryTick: number) {
+    if (environment.game) {
+      console.log(
+        `%conTradeInviteReceived`,
+        'background: #FFC107; color: #000; padding: 3px; font-size: 9px;',
+        inviterId,
+        expiryTick,
+      );
+    }
+    this.zone.run(() => {
+      this.tradeInviteChange.next({ inviterId, expiryTick });
+    });
+  }
+
+  private onTradeInviteExpired(inviterId: number) {
+    if (environment.game) {
+      console.log(
+        `%conTradeInviteExpired`,
+        'background: #FFC107; color: #000; padding: 3px; font-size: 9px;',
+        inviterId,
+      );
+    }
+    this.zone.run(() => {
+      this.tradeInviteExpiredChange.next(inviterId);
+    });
+  }
+
+  private onTradeStateUpdated(
+    active: boolean,
+    partnerId: number,
+    initiatedBySelf: boolean,
+    selfReady: boolean,
+    partnerReady: boolean,
+    selfItems: unknown[],
+    partnerItems: unknown[],
+    inventory: unknown[],
+    countdownMs: number,
+    countdownTotalMs: number,
+  ) {
+    if (environment.game) {
+      console.log(
+        `%conTradeStateUpdated`,
+        'background: #FFC107; color: #000; padding: 3px; font-size: 9px;',
+        active,
+        partnerId,
+        initiatedBySelf,
+        selfReady,
+        partnerReady,
+        selfItems,
+        partnerItems,
+        inventory,
+        countdownMs,
+        countdownTotalMs,
+      );
+    }
+
+    const normalized: TradeStatePayload = {
+      active: Boolean(active),
+      partnerId: Number.isFinite(partnerId) ? partnerId : 0,
+      initiatedBySelf: Boolean(initiatedBySelf),
+      selfReady: Boolean(selfReady),
+      partnerReady: Boolean(partnerReady),
+      selfItems: Array.isArray(selfItems)
+        ? selfItems.map(item => this.normalizeTradeItem(item))
+        : [],
+      partnerItems: Array.isArray(partnerItems)
+        ? partnerItems.map(item => this.normalizeTradeItem(item))
+        : [],
+      inventory: Array.isArray(inventory)
+        ? inventory.map(item => this.normalizeTradeItem(item))
+        : [],
+      countdownMs: Number.isFinite(countdownMs) ? Number(countdownMs) : 0,
+      countdownTotalMs: Number.isFinite(countdownTotalMs)
+        ? Number(countdownTotalMs)
+        : 0,
+    };
+
+    this.zone.run(() => {
+      this.tradeStateChange.next(normalized);
+    });
+  }
+
+  private onTradeCancelled(
+    partnerId: number,
+    reason: number,
+    wasInitiator: boolean,
+  ) {
+    if (environment.game) {
+      console.log(
+        `%conTradeCancelled`,
+        'background: #FFC107; color: #000; padding: 3px; font-size: 9px;',
+        partnerId,
+        reason,
+        wasInitiator,
+      );
+    }
+    this.zone.run(() => {
+      this.tradeCancelledChange.next({ partnerId, reason, wasInitiator });
+    });
+  }
+
+  private onTradeCompleted(partnerId: number) {
+    if (environment.game) {
+      console.log(
+        `%conTradeCompleted`,
+        'background: #FFC107; color: #000; padding: 3px; font-size: 9px;',
+        partnerId,
+      );
+    }
+    this.zone.run(() => {
+      this.tradeCompletedChange.next(partnerId);
+    });
+  }
+
+  private normalizeTradeItem(payload: any): TradeItemPayload {
+    const modId = Number.isFinite(payload?.modId) ? Number(payload.modId) : 0;
+    const baseId = Number.isFinite(payload?.baseId)
+      ? Number(payload.baseId)
+      : 0;
+    const count = Math.max(
+      0,
+      Number.isFinite(payload?.count) ? Number(payload.count) : 0,
+    );
+    const isQuestItem = Boolean(payload?.isQuestItem);
+    const fallbackName = `0x${modId.toString(16).padStart(8, '0')}:0x${baseId
+      .toString(16)
+      .padStart(8, '0')}`;
+    const name =
+      typeof payload?.name === 'string' && payload.name.length > 0
+        ? payload.name
+        : fallbackName;
+
+    const item: TradeItemPayload = {
+      modId,
+      baseId,
+      count,
+      isQuestItem,
+      name,
+    };
+
+    if (payload?.inventoryIndex !== undefined) {
+      item.inventoryIndex = Number(payload.inventoryIndex);
+    }
+    if (payload?.offeredCount !== undefined) {
+      item.offeredCount = Math.max(
+        0,
+        Number.isFinite(payload.offeredCount)
+          ? Number(payload.offeredCount)
+          : 0,
+      );
+    }
+    if (payload?.isGold !== undefined) {
+      item.isGold = Boolean(payload.isGold);
+    }
+    if (Array.isArray(payload?.details)) {
+      item.details = payload.details.map((entry: any) => String(entry));
+    }
+    if (item.isGold === undefined) {
+      item.isGold = modId === 0 && baseId === 0x0000000f;
+    }
+    item.raw = payload;
+
+    return item;
+  }
+
+  /**
+   * Called when the death screen is shown.
+   */
+  private onShowDeathScreen(secondsRemaining: number): void {
+    if (environment.game) {
+      console.log(
+        `%conShowDeathScreen`,
+        'background: #f44336; color: #fff; padding: 3px; font-size: 9px;',
+        secondsRemaining,
+      );
+    }
+    this.zone.run(() => {
+      this.deathScreenChange.next(secondsRemaining);
+    });
+  }
+
+  /**
+   * Called when the death screen timer updates.
+   */
+  private onUpdateDeathTimer(secondsRemaining: number): void {
+    if (environment.game) {
+      console.log(
+        `%conUpdateDeathTimer`,
+        'background: #f44336; color: #fff; padding: 3px; font-size: 9px;',
+        secondsRemaining,
+      );
+    }
+    this.zone.run(() => {
+      this.deathTimerChange.next(secondsRemaining);
+    });
+  }
+
+  /**
+   * Called when the respawn button is enabled.
+   */
+  private onEnableRespawnButton(): void {
+    if (environment.game) {
+      console.log(
+        `%conEnableRespawnButton`,
+        'background: #4caf50; color: #fff; padding: 3px; font-size: 9px;',
+      );
+    }
+    this.zone.run(() => {
+      this.respawnButtonEnabledChange.next();
+    });
+  }
+
+  /**
+   * Called when the death screen is hidden.
+   */
+  private onHideDeathScreen(): void {
+    if (environment.game) {
+      console.log(
+        `%conHideDeathScreen`,
+        'background: #2196f3; color: #fff; padding: 3px; font-size: 9px;',
+      );
+    }
+    this.zone.run(() => {
+      this.deathScreenHiddenChange.next();
+    });
+  }
+
+  private onUpdateReviveVictimProgress(
+    elapsedSeconds: number,
+    totalSeconds: number,
+    healerName: string,
+  ): void {
+    if (environment.game) {
+      console.log(
+        `%conUpdateReviveVictimProgress`,
+        'background: #9c27b0; color: #fff; padding: 3px; font-size: 9px;',
+        elapsedSeconds,
+        totalSeconds,
+      );
+    }
+    this.zone.run(() => {
+      this.reviveVictimProgressChange.next({
+        elapsedSeconds,
+        totalSeconds,
+        label: healerName,
+      });
+    });
+  }
+
+  private onStopReviveVictimProgress(): void {
+    if (environment.game) {
+      console.log(
+        `%conStopReviveVictimProgress`,
+        'background: #9c27b0; color: #fff; padding: 3px; font-size: 9px;',
+      );
+    }
+    this.zone.run(() => {
+      this.reviveVictimProgressChange.next(undefined);
+    });
+  }
+
+  private onUpdateReviveHealerProgress(
+    elapsedSeconds: number,
+    totalSeconds: number,
+  ): void {
+    if (environment.game) {
+      console.log(
+        `%conUpdateReviveHealerProgress`,
+        'background: #00acc1; color: #fff; padding: 3px; font-size: 9px;',
+        elapsedSeconds,
+        totalSeconds,
+      );
+    }
+    this.zone.run(() => {
+      this.reviveHealerProgressChange.next({
+        elapsedSeconds,
+        totalSeconds,
+      });
+    });
+  }
+
+  private onStopReviveHealerProgress(): void {
+    if (environment.game) {
+      console.log(
+        `%conStopReviveHealerProgress`,
+        'background: #00acc1; color: #fff; padding: 3px; font-size: 9px;',
+      );
+    }
+    this.zone.run(() => {
+      this.reviveHealerProgressChange.next(undefined);
+    });
+  }
+
+  /**
+   * Called when the player clicks the respawn button.
+   */
+  public respawnButtonClicked(): void {
+    skyrimtogether.respawnButtonClicked();
   }
 }

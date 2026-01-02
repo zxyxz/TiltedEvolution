@@ -8,7 +8,9 @@ export interface ErrorEvent {
     | 'wrong_version'
     | 'mods_mismatch'
     | 'client_mods_disallowed'
-    | 'wrong_password'
+    | 'wrong_account_password'
+    | 'wrong_server_password'
+    | 'duplicate_user'
     | 'server_full'
     | 'no_reason'
     | 'bad_uGridsToLoad'
@@ -92,6 +94,9 @@ export class ErrorService {
           break;
         case 'client_mods_disallowed':
           data = { mods: error.data.mods.join(', ') };
+          break;
+        case 'duplicate_user':
+          data = {};
           break;
       }
       message = await firstValueFrom(

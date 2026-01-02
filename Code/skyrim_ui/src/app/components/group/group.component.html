@@ -10,18 +10,31 @@
       class="group-member"
       [class.not-loaded]="!player.isLoaded"
     >
-      <b class="group-member-level">{{ player.level }} </b>
-      <div *ngIf="player.health === 0" class="group-member-dead"></div>
-      <div *ngIf="player.isOwner" class="group-member-leader"></div>
-      <span class="member-name">{{ player.name }}</span>
-      <div
-        *ngIf="player.health !== undefined && player.isLoaded"
-        class="group-member-health"
-      >
+      <img
+        class="member-avatar"
+        [src]="player.avatar || defaultAvatar"
+        [alt]="player.name"
+        draggable="false"
+      />
+      <div class="member-details">
+        <div class="member-header">
+          <b class="group-member-level">{{ player.level }} </b>
+          <div *ngIf="player.health === 0" class="group-member-dead"></div>
+          <div *ngIf="player.isOwner" class="group-member-leader"></div>
+          <span class="member-name-wrap">
+            <span class="member-name">{{ player.name }}</span>
+            <span *ngIf="player.isLocal" class="member-self">(You)</span>
+          </span>
+        </div>
         <div
-          class="group-member-health-value"
-          [app-health]="player.health"
-        ></div>
+          *ngIf="player.health !== undefined && player.isLoaded"
+          class="group-member-health"
+        >
+          <div
+            class="group-member-health-value"
+            [app-health]="player.health"
+          ></div>
+        </div>
       </div>
     </div>
   </div>

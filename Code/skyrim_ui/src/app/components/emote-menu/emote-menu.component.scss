@@ -1,0 +1,250 @@
+@import 'env';
+@import 'functions/mod';
+@import 'functions/rem';
+
+$-color-primary: #8ac8ff;
+
+:host {
+  display: block;
+}
+
+.emote-menu {
+  display: flex;
+  flex-direction: column;
+  gap: $-size-gap;
+}
+
+.emote-menu__header {
+  display: grid;
+  gap: rem(16, 4);
+
+  .eyebrow {
+    letter-spacing: 0.1em;
+    font-size: rem(16, 11);
+    text-transform: uppercase;
+    color: mod($-color-primary, 0.3);
+  }
+
+  h2 {
+    margin: 0;
+    font-size: rem(16, 24);
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: mod($-color-primary, 0.1);
+  }
+
+  .subtitle {
+    margin: 0;
+    color: mod($-color-background, 0.5);
+  }
+}
+
+.emote-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: rem(16, 8);
+  margin-top: rem(16, 6);
+}
+
+.emote-filter {
+  padding: rem(16, 8) rem(16, 12);
+  border-radius: rem(16, 12);
+  border: 1px solid mod($-color-background, 0.4);
+  background: mod($-color-background, 0.2);
+  color: mod($-color-primary, 0.08);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-size: rem(16, 12);
+  transition: border-color 120ms ease, transform 120ms ease,
+    background-color 120ms ease;
+
+  &[data-active='true'] {
+    border-color: mod($-color-primary, 0.1);
+    background: rgba(138, 200, 255, 0.12);
+    transform: translateY(-2px);
+  }
+}
+
+.emote-wheel {
+  position: relative;
+  width: clamp(18rem, 50vw, 30rem);
+  aspect-ratio: 1;
+  margin: 0.5rem auto;
+  display: grid;
+  place-items: center;
+  isolation: isolate;
+  overflow: visible;
+}
+
+.emote-wheel__ring {
+  position: absolute;
+  inset: 8%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.07), transparent),
+    conic-gradient(
+      from 90deg,
+      rgba(138, 200, 255, 0.35),
+      rgba(52, 82, 120, 0.4),
+      rgba(138, 200, 255, 0.35),
+      rgba(90, 170, 220, 0.42)
+    );
+  filter: blur(10px);
+  opacity: 0.7;
+  z-index: 0;
+}
+
+.emote-wheel__center {
+  position: relative;
+  z-index: 2;
+  width: 9rem;
+  height: 9rem;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.12), rgba(0, 0, 0, 0.45));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.45);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 0.75rem;
+}
+
+.emote-wheel__current-title {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: mod($-color-primary, 0.05);
+  margin-bottom: rem(16, 4);
+}
+
+.emote-wheel__current-desc {
+  font-size: rem(16, 12);
+  color: mod($-color-background, 0.5);
+  line-height: 1.3;
+}
+
+.emote-wheel__hint {
+  font-size: rem(16, 11);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: mod($-color-background, 0.5);
+}
+
+.emote-wheel__key {
+  margin-top: 0.35rem;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: $-color-primary;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.emote-wheel__slice {
+  --i: 0;
+  --total: 1;
+  position: absolute;
+  width: 48%;
+  height: 48%;
+  inset: 0;
+  margin: auto;
+  border: none;
+  background: none;
+  color: white;
+  cursor: pointer;
+  transform: rotate(calc(360deg / var(--total) * var(--i)))
+    translateY(-48%)
+    rotate(calc(-360deg / var(--total) * var(--i)));
+  transition: transform 120ms ease, filter 120ms ease, opacity 120ms ease;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 0.5rem;
+  z-index: 1;
+  opacity: 0.85;
+  border-radius: 12px;
+
+  .emote-wheel__label {
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: mod($-color-background, 0.1);
+    background: rgba(0, 0, 0, 0.35);
+    padding: 0.4rem 0.55rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .emote-wheel__desc {
+    margin-top: 0.35rem;
+    font-size: rem(16, 12);
+    color: mod($-color-background, 0.45);
+    max-width: 12ch;
+    line-height: 1.2;
+  }
+
+  &:hover {
+    transform: rotate(calc(360deg / var(--total) * var(--i)))
+      translateY(-60%)
+      rotate(calc(-360deg / var(--total) * var(--i)));
+    filter: drop-shadow(0 0 10px rgba(138, 200, 255, 0.4));
+    opacity: 1;
+  }
+}
+
+.emote-wheel__slice::after {
+  content: '';
+  position: absolute;
+  width: 55%;
+  height: 55%;
+  border-radius: 50%;
+  inset: 0;
+  margin: auto;
+  background: conic-gradient(
+    from calc(360deg / var(--total) * var(--i)),
+    rgba(255, 255, 255, 0.08),
+    transparent 70%
+  );
+  opacity: 0.5;
+  z-index: -1;
+}
+
+.emote-wheel__empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: mod($-color-background, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.emote-wheel__slice[data-tone='sun'] .emote-wheel__label {
+  background: rgba(255, 196, 99, 0.25);
+  color: #ffd9a1;
+}
+
+.emote-wheel__slice[data-tone='ember'] .emote-wheel__label {
+  background: rgba(255, 125, 69, 0.24);
+  color: #ffc7aa;
+}
+
+.emote-wheel__slice[data-tone='mystic'] .emote-wheel__label {
+  background: rgba(116, 140, 255, 0.26);
+  color: #d1dbff;
+}
+
+.emote-wheel__slice[data-tone='bard'] .emote-wheel__label {
+  background: rgba(162, 88, 255, 0.24);
+  color: #ead6ff;
+}
+
+.emote-wheel__slice[data-tone='ale'] .emote-wheel__label {
+  background: rgba(156, 117, 62, 0.28);
+  color: #ffe5c5;
+}
+
+.emote-wheel__slice[data-tone='calm'] .emote-wheel__label {
+  background: rgba(109, 131, 118, 0.26);
+  color: #d6f2df;
+}

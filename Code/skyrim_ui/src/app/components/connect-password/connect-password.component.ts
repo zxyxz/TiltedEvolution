@@ -25,9 +25,10 @@ import { DestroyService } from '../../services/destroy.service';
 })
 export class ConnectPasswordComponent implements AfterViewInit {
   public address = '';
-  public name = '';
+  public username = '';
   public port = 10578;
-  public password = '';
+  public accountPassword = '';
+  public serverPassword = '';
   public savePassword = false;
   public hidePassword = true;
 
@@ -80,11 +81,45 @@ export class ConnectPasswordComponent implements AfterViewInit {
         }
       });
 
-    this.name = this.uiRepository.getConnectName();
-    this.address = this.uiRepository.getConnectIp();
-    this.port = this.uiRepository.getConnectPort();
-    this.password = this.getStoredPasswordForAddress(this.address, this.port);
-    this.savePassword = this.password !== '';
+    const connectIp = this.uiRepository.getConnectIp();
+    if (connectIp) {
+      this.address = connectIp;
+    }
+
+    const connectPort = this.uiRepository.getConnectPort();
+    if (Number.isFinite(connectPort)) {
+      this.port = connectPort;
+    }
+
+    const savedEntry = this.getSavedServerEntry(this.address, this.port);
+    const storedUsername = this.storeService.get('last_connected_username', '');
+    const storedAccountPassword = this.storeService.get(
+      'last_connected_password',
+      '',
+    );
+    const repoUsername = this.uiRepository.getConnectUsername();
+    const repoAccountPassword = this.uiRepository.getConnectAccountPassword();
+
+    this.username =
+      (repoUsername && repoUsername.length > 0
+        ? repoUsername
+        : savedEntry?.username) ||
+      storedUsername ||
+      this.username;
+
+    this.accountPassword =
+      (repoAccountPassword && repoAccountPassword.length > 0
+        ? repoAccountPassword
+        : savedEntry?.accountPassword) ||
+      storedAccountPassword ||
+      this.accountPassword;
+
+    this.serverPassword = savedEntry?.serverPassword ?? this.serverPassword;
+
+    this.savePassword =
+      (!!this.username && this.username.length > 0) ||
+      (!!this.accountPassword && this.accountPassword.length > 0) ||
+      (!!this.serverPassword && this.serverPassword.length > 0);
   }
 
   public ngAfterViewInit(): void {
@@ -105,36 +140,63 @@ export class ConnectPasswordComponent implements AfterViewInit {
       return;
     }
 
+    const username = (this.username ?? '').trim();
+
+    if (username.length === 0) {
+      this.sound.play(Sound.Fail);
+      const message = await firstValueFrom(
+        this.translocoService.selectTranslate(
+          'COMPONENT.CONNECT.ERROR.INVALID_USERNAME',
+        ),
+      );
+      await this.errorService.setError(message);
+      return;
+    }
+
     this.connecting = true;
 
     this.sound.play(Sound.Ok);
     if (this.savePassword) {
-      this.storePasswordLocally(this.address, this.port, this.password);
+      this.saveServerEntry(this.address, this.port, {
+        username,
+        accountPassword: this.accountPassword,
+        serverPassword: this.serverPassword,
+      });
+      this.storeService.set('last_connected_username', username);
+      this.storeService.set('last_connected_password', this.accountPassword);
+    } else {
+      this.removeSavedServerEntry(this.address, this.port);
+      this.storeService.remove('last_connected_username');
+      this.storeService.remove('last_connected_password');
     }
+    this.username = username;
 
-    this.client.connect(this.address, this.port, this.password);
+    this.client.connect(
+      this.address,
+      this.port,
+      username,
+      this.accountPassword,
+      this.serverPassword,
+    );
   }
 
   public cancel(): void {
-    this.uiRepository.openView(View.SERVER_LIST);
+    const returnView = this.uiRepository.getConnectReturnView() ?? View.CONNECT;
+    this.uiRepository.openView(returnView);
   }
 
-  private getStoredPasswordForAddress(ip: string, port: number): string {
-    let savedServerList = JSON.parse(
-      this.storeService.get('savedServerList', '[]'),
-    );
-    let savedServer = savedServerList.find(
-      saved => saved.ip === ip && saved.port === port,
-    );
-
-    return savedServer?.password ?? '';
-  }
-
-  private storePasswordLocally(
+  private getSavedServerEntry(
     ip: string,
     port: number,
-    password: string,
-  ): void {
+  ):
+    | {
+        ip: string;
+        port: number;
+        username?: string;
+        accountPassword?: string;
+        serverPassword?: string;
+      }
+    | undefined {
     let savedServerList = JSON.parse(
       this.storeService.get('savedServerList', '[]'),
     );
@@ -143,11 +205,58 @@ export class ConnectPasswordComponent implements AfterViewInit {
     );
 
     if (savedServer) {
-      savedServer.password = password;
-    } else {
-      savedServerList.push({ ip: ip, port: port, password: password });
+      if (
+        savedServer.password &&
+        (!savedServer.serverPassword || savedServer.serverPassword.length === 0)
+      ) {
+        savedServer.serverPassword = savedServer.password;
+      }
+      return savedServer;
     }
+
+    return undefined;
+  }
+
+  private saveServerEntry(
+    ip: string,
+    port: number,
+    entry: {
+      username: string;
+      accountPassword: string;
+      serverPassword: string;
+    },
+  ): void {
+    let savedServerList = JSON.parse(
+      this.storeService.get('savedServerList', '[]'),
+    );
+    let savedServer = savedServerList.find(
+      saved => saved.ip === ip && saved.port === port,
+    );
+
+    if (!savedServer) {
+      savedServer = { ip, port };
+      savedServerList.push(savedServer);
+    }
+
+    savedServer.username = entry.username;
+    savedServer.accountPassword = entry.accountPassword;
+    savedServer.serverPassword = entry.serverPassword;
+    if (savedServer.password) {
+      delete savedServer.password;
+    }
+
     this.storeService.set('savedServerList', JSON.stringify(savedServerList));
+  }
+
+  private removeSavedServerEntry(ip: string, port: number): void {
+    let savedServerList = JSON.parse(
+      this.storeService.get('savedServerList', '[]'),
+    );
+    const filtered = savedServerList.filter(
+      saved => !(saved.ip === ip && saved.port === port),
+    );
+
+    this.storeService.set('savedServerList', JSON.stringify(filtered));
   }
 
   @HostListener('window:keydown.escape', ['$event'])

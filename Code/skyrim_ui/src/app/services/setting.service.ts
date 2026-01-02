@@ -1,6 +1,8 @@
 import { Injectable } from '@angular/core';
 import { TranslocoService } from '@ngneat/transloco';
 import { BehaviorSubject } from 'rxjs';
+import { environment } from '../../environments/environment';
+import { NametagMode } from '../models/nametag-mode.enum';
 import { StoreService } from './store.service';
 
 export enum FontSize {
@@ -101,6 +103,12 @@ export class SettingService {
     PartyAnchor,
   ) as PartyAnchor[];
   private readonly autoHideTimeValues = autoHideTimerLengths;
+  private readonly nametagModeValues: NametagMode[] = [
+    NametagMode.Detailed,
+    NametagMode.Basic,
+    NametagMode.Hidden,
+    NametagMode.Normal,
+  ];
 
   public settings = {
     volume: new SliderSetting(this.storeService, 'audio_volume', 0.5),
@@ -116,6 +124,12 @@ export class SettingService {
       'font_size',
       this.fontSizeValues,
       FontSize.M,
+    ),
+    nametagMode: new SelectSetting(
+      this.storeService,
+      'nametag_mode',
+      this.nametagModeValues,
+      NametagMode.Normal,
     ),
     isPartyShown: new ToggleSetting(this.storeService, 'party_isShown', true),
     autoHideParty: new ToggleSetting(
@@ -155,5 +169,17 @@ export class SettingService {
     this.settings.language.subscribe(lang =>
       translocoService.setActiveLang(lang),
     );
+    this.settings.nametagMode.subscribe(mode => this.pushNametagMode(mode));
+  }
+
+  private pushNametagMode(mode: NametagMode): void {
+    if (!environment.game) {
+      return;
+    }
+
+    const api = (globalThis as any).skyrimtogether;
+    if (api && typeof api.setNameTagMode === 'function') {
+      api.setNameTagMode(mode);
+    }
   }
 }

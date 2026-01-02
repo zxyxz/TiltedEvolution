@@ -21,6 +21,7 @@ void WRLD::ParseChunks(WRLD& aSourceRecord, Map<uint8_t, uint32_t>& aParentToFor
                 m_parentId = id;
             }
             break;
+            case ChunkId::ONAM_ID: m_onam = Chunks::ONAM(aReader); break;
             case ChunkId::ZNAM_ID: aReader.ReadBytes(reinterpret_cast<uint8_t*>(&m_musicId), sizeof(m_musicId)); break;
             case ChunkId::NAMA_ID: aReader.ReadBytes(reinterpret_cast<uint8_t*>(&m_lodMultiplier), sizeof(m_lodMultiplier)); break;
             }

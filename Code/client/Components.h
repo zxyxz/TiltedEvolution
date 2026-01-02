@@ -15,9 +15,12 @@
 #include <Components/FaceGenComponent.h>
 #include <Components/CacheComponent.h>
 #include <Components/WaitingFor3D.h>
+#include <Components/PendingInventoryComponent.h>
+#include <Components/PendingEquipmentComponent.h>
 #include <Components/ActorValuesComponent.h>
 #include <Components/ObjectComponent.h>
 #include <Components/PlayerComponent.h>
 #include <Components/CombatComponent.h>
+#include <Components/GhostComponent.h>
 
 #undef TP_INTERNAL_COMPONENTS_GUARD

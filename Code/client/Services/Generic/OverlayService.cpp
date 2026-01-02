@@ -18,14 +18,23 @@
 #include <Messages/NotifyPlayerList.h>
 #include <Messages/NotifyPlayerLeft.h>
 #include <Messages/NotifyPlayerJoined.h>
+#include <Messages/NotifyPlayerProfileImage.h>
 #include <Messages/NotifyPlayerDialogue.h>
 #include <Messages/NotifyPlayerLevel.h>
 #include <Messages/NotifyPlayerCellChanged.h>
 #include <Messages/NotifyTeleport.h>
+#include <Messages/NotifyTeleportCountdown.h>
+#include <Messages/NotifyTeleportRequest.h>
 #include <Messages/RequestPlayerHealthUpdate.h>
 #include <Messages/NotifyPlayerHealthUpdate.h>
+#include <Messages/NotifyCommandList.h>
+#include <Messages/NotifyPlayEmote.h>
+#include <Messages/NotifyCancelEmote.h>
+#include <Messages/CancelEmoteRequest.h>
 
+#include <DefaultObjectManager.h>
 #include <Structs/GridCellCoords.h>
+#include <EquipManager.h>
 
 #include <Events/ConnectedEvent.h>
 #include <Events/DisconnectedEvent.h>
@@ -38,9 +47,62 @@
 #include <Forms/TESWorldSpace.h>
 #include <Forms/TESObjectCELL.h>
 #include <Games/ActorExtension.h>
+#include <AI/Movement/PlayerControls.h>
+#include <Services/OverlayClient.h>
+#include <Misc/BSFixedString.h>
+#include <Games/Skyrim/Interface/UI.h>
+#include <Components.h>
+#include <client/Utils.h>
+#include <cstring>
+#include <string>
+#include <string_view>
+#include <chrono>
 
 using TiltedPhoques::OverlayRenderHandler;
 using TiltedPhoques::OverlayRenderHandlerD3D11;
+
+namespace
+{
+bool IsAnyMenuOpen() noexcept
+{
+    UI* pUI = UI::Get();
+    if (!pUI)
+        return false;
+
+    for (auto* pMenu : pUI->menuStack)
+    {
+        if (!pMenu)
+            continue;
+
+        const BSFixedString* pName = pUI->LookupMenuNameByInstance(pMenu);
+        if (pName && (std::strcmp(pName->AsAscii(), "HUD Menu") == 0 || std::strcmp(pName->AsAscii(), "HUDMenu") == 0))
+            continue;
+
+        return true;
+    }
+
+    return false;
+}
+
+bool TryGetLocalServerId(uint32_t& aOutId) noexcept
+{
+    auto* pPlayer = PlayerCharacter::Get();
+    if (!pPlayer)
+        return false;
+
+    auto view = World::Get().view<FormIdComponent, LocalComponent>();
+    for (entt::entity entity : view)
+    {
+        if (view.get<FormIdComponent>(entity).Id != pPlayer->formID)
+            continue;
+
+        aOutId = view.get<LocalComponent>(entity).Id;
+        return true;
+    }
+
+    return false;
+}
+}
 
 struct D3D11RenderProvider final : OverlayApp::RenderProvider, OverlayRenderHandlerD3D11::Renderer
 {
@@ -60,8 +122,6 @@ struct D3D11RenderProvider final : OverlayApp::RenderProvider, OverlayRenderHand
     [[nodiscard]] HWND GetWindow() override { return m_pRenderSystem->GetWindow(); }
 
     [[nodiscard]] IDXGISwapChain* GetSwapChain() const noexcept override { return m_pRenderSystem->GetSwapChain(); }
-    [[nodiscard]] ID3D11Device* GetDevice() const noexcept override { return m_pRenderSystem->GetDevice(); }
-    [[nodiscard]] ID3D11DeviceContext* GetDeviceContext() const noexcept override { return m_pRenderSystem->GetDeviceContext(); }
 
 private:
     RenderSystemD3D11* m_pRenderSystem;
@@ -118,13 +178,19 @@ OverlayService::OverlayService(World& aWorld, TransportService& transport, entt:
     m_chatMessageConnection = aDispatcher.sink<NotifyChatMessageBroadcast>().connect<&OverlayService::OnChatMessageReceived>(this);
     m_playerJoinedConnection = aDispatcher.sink<NotifyPlayerJoined>().connect<&OverlayService::OnPlayerJoined>(this);
     m_playerLeftConnection = aDispatcher.sink<NotifyPlayerLeft>().connect<&OverlayService::OnPlayerLeft>(this);
+    m_playerAvatarConnection = aDispatcher.sink<NotifyPlayerProfileImage>().connect<&OverlayService::OnPlayerProfileImage>(this);
     m_playerDialogueConnection = aDispatcher.sink<NotifyPlayerDialogue>().connect<&OverlayService::OnPlayerDialogue>(this);
     m_playerAddedConnection = m_world.on_destroy<WaitingFor3D>().connect<&OverlayService::OnWaitingFor3DRemoved>(this);
     m_playerRemovedConnection = m_world.on_destroy<PlayerComponent>().connect<&OverlayService::OnPlayerComponentRemoved>(this);
     m_playerLevelConnection = aDispatcher.sink<NotifyPlayerLevel>().connect<&OverlayService::OnPlayerLevel>(this);
     m_cellChangedConnection = aDispatcher.sink<NotifyPlayerCellChanged>().connect<&OverlayService::OnPlayerCellChanged>(this);
+    m_teleportRequestConnection = aDispatcher.sink<NotifyTeleportRequest>().connect<&OverlayService::OnNotifyTeleportRequest>(this);
     m_teleportConnection = aDispatcher.sink<NotifyTeleport>().connect<&OverlayService::OnNotifyTeleport>(this);
+    m_teleportCountdownConnection = aDispatcher.sink<NotifyTeleportCountdown>().connect<&OverlayService::OnNotifyTeleportCountdown>(this);
     m_playerHealthConnection = aDispatcher.sink<NotifyPlayerHealthUpdate>().connect<&OverlayService::OnNotifyPlayerHealthUpdate>(this);
+    m_commandListConnection = aDispatcher.sink<NotifyCommandList>().connect<&OverlayService::OnNotifyCommandList>(this);
+    m_playEmoteConnection = aDispatcher.sink<NotifyPlayEmote>().connect<&OverlayService::OnNotifyPlayEmote>(this);
+    m_cancelEmoteConnection = aDispatcher.sink<NotifyCancelEmote>().connect<&OverlayService::OnNotifyCancelEmote>(this);
     m_partyJoinedConnection = aDispatcher.sink<PartyJoinedEvent>().connect<&OverlayService::OnPartyJoinedEvent>(this);
     m_partyLeftConnection = aDispatcher.sink<PartyLeftEvent>().connect<&OverlayService::OnPartyLeftEvent>(this);
 }
@@ -275,10 +341,158 @@ void OverlayService::SetPlayerHealthPercentage(uint32_t aFormId) const noexcept
     m_pOverlay->ExecuteAsync("setHealth", pArguments);
 }
 
+void OverlayService::SetPartyPinsJson(const std::string& aJson) noexcept
+{
+    if (!m_pOverlay)
+        return;
+
+    auto pArguments = CefListValue::Create();
+    pArguments->SetString(0, aJson);
+    m_pOverlay->ExecuteAsync("setPartyPins", pArguments);
+}
+
 void OverlayService::OnUpdate(const UpdateEvent&) noexcept
 {
     RunDebugDataUpdates();
     RunPlayerHealthUpdates();
+    UpdateRemoteEmoteLoops();
+
+    // Allow cancelling emotes from the keyboard even when the menu is closed.
+    const bool cancelRequested = (GetAsyncKeyState(VK_OEM_PERIOD) & 0x8001) != 0;
+    const bool allowCancel = g_emoteWheelActive.load() || (!m_active && !IsAnyMenuOpen());
+    if (cancelRequested && allowCancel)
+    {
+        const bool wasEmoting = g_emoteWheelActive.load();
+        if (auto* pPlayer = PlayerCharacter::Get())
+        {
+            if (auto* pExt = pPlayer->GetExtension())
+            {
+                pExt->LatestAnimation = {};
+            }
+
+            BSFixedString stopEvent("IdleForceDefaultState");
+            BSFixedString stopInstant("IdleStopInstant");
+            pPlayer->SendAnimationEvent(&stopInstant);
+            pPlayer->SendAnimationEvent(&stopEvent);
+            g_emoteWheelActive.store(false);
+            g_emoteEventName.clear();
+            g_emoteStartValid.store(false);
+
+            if (wasEmoting && m_transport.IsConnected())
+            {
+                uint32_t serverId = 0;
+                if (TryGetLocalServerId(serverId))
+                {
+                    CancelEmoteRequest request{};
+                    request.ServerId = serverId;
+                    m_transport.Send(request);
+                }
+            }
+
+            // Re-equip current weapons/spells to refresh combat state (prevents stuck hands).
+            if (auto* pEquipManager = EquipManager::Get())
+            {
+                auto& defaults = DefaultObjectManager::Get();
+
+                TESForm* pLeftSpell = pPlayer->magicItems[0];
+                TESForm* pRightSpell = pPlayer->magicItems[1];
+
+                TESForm* pLeftWeapon = pLeftSpell ? nullptr : pPlayer->GetEquippedWeapon(0);
+                TESForm* pRightWeapon = pRightSpell ? nullptr : pPlayer->GetEquippedWeapon(1);
+                TESForm* pTwoHand = (pLeftWeapon && pRightWeapon && pLeftWeapon == pRightWeapon) ? pLeftWeapon : nullptr;
+
+                if (pLeftSpell)
+                    pEquipManager->EquipSpell(pPlayer, pLeftSpell, 0);
+                else if (pLeftWeapon && !pTwoHand)
+                    pEquipManager->Equip(pPlayer, pLeftWeapon, nullptr, 1, defaults.leftEquipSlot, false, true, false, false);
+
+                if (pRightSpell)
+                    pEquipManager->EquipSpell(pPlayer, pRightSpell, 1);
+                else if (pTwoHand)
+                    pEquipManager->Equip(pPlayer, pTwoHand, nullptr, 1, defaults.eitherEquipSlot, false, true, false, false);
+                else if (pRightWeapon)
+                    pEquipManager->Equip(pPlayer, pRightWeapon, nullptr, 1, defaults.rightEquipSlot, false, true, false, false);
+
+                if (auto* pAmmo = pPlayer->GetEquippedAmmo())
+                    pEquipManager->Equip(pPlayer, pAmmo, nullptr, 1, defaults.rightEquipSlot, false, true, false, false);
+
+                if (auto* pShout = pPlayer->equippedShout)
+                    pEquipManager->EquipShout(pPlayer, pShout);
+            }
+
+            if (m_pOverlay)
+            {
+                auto pArgs = CefListValue::Create();
+                pArgs->SetString(0, "Emote cancelled");
+                pArgs->SetInt(1, 2000);
+                m_pOverlay->ExecuteAsync("showBanner", pArgs);
+            }
+        }
+    }
+
+    // Keep looping emotes that have a timeout
+    if (g_emoteWheelActive.load())
+    {
+        // Keep looping emotes that have a timeout
+        if (!g_emoteEventName.empty() && g_emoteEventName != "IdleForceDefaultState" && g_emoteEventName != "IdleStopInstant")
+        {
+            static constexpr auto kKeepAlive = std::chrono::seconds(2);
+            const auto now = std::chrono::steady_clock::now();
+            if (now - g_emoteLastPlayed > kKeepAlive)
+            {
+                if (auto* pPlayer = PlayerCharacter::Get())
+                {
+                    if (g_emoteStartValid.load())
+                    {
+                        // Snap back to the same transform we started from so looping emotes don't drift.
+                        pPlayer->position = g_emoteStartPos;
+                        pPlayer->SetRotation(g_emoteStartRot.x, g_emoteStartRot.y, g_emoteStartRot.z);
+                    }
+
+                    BSFixedString keepAlive(g_emoteEventName.c_str());
+                    pPlayer->SendAnimationEvent(&keepAlive);
+                    g_emoteLastPlayed = now;
+                }
+            }
+        }
+    }
+}
+
+void OverlayService::UpdateRemoteEmoteLoops() noexcept
+{
+    if (m_remoteEmotes.empty())
+        return;
+
+    static constexpr auto kKeepAlive = std::chrono::seconds(2);
+    const auto now = std::chrono::steady_clock::now();
+
+    for (auto it = m_remoteEmotes.begin(); it != m_remoteEmotes.end();)
+    {
+        if (it->second.EventName.empty() ||
+            it->second.EventName == "IdleForceDefaultState" ||
+            it->second.EventName == "IdleStopInstant")
+        {
+            it = m_remoteEmotes.erase(it);
+            continue;
+        }
+
+        Actor* pActor = Utils::GetByServerId<Actor>(it->first);
+        if (!pActor || pActor == PlayerCharacter::Get())
+        {
+            it = m_remoteEmotes.erase(it);
+            continue;
+        }
+
+        if (now - it->second.LastPlayed > kKeepAlive)
+        {
+            pActor->SetWeaponDrawnEx(false);
+            BSFixedString keepAlive(it->second.EventName.c_str());
+            pActor->SendAnimationEvent(&keepAlive);
+            it->second.LastPlayed = now;
+        }
+
+        ++it;
+    }
 }
 
 void OverlayService::OnConnectedEvent(const ConnectedEvent& acEvent) noexcept
@@ -371,6 +585,7 @@ void OverlayService::OnPlayerJoined(const NotifyPlayerJoined& acMessage) noexcep
 
     String cellName = GetCellName(acMessage.WorldSpaceId, acMessage.CellId);
     pArguments->SetString(3, cellName.c_str());
+    pArguments->SetString(4, acMessage.Avatar.c_str());
 
     m_pOverlay->ExecuteAsync("playerConnected", pArguments);
 }
@@ -381,6 +596,17 @@ void OverlayService::OnPlayerLeft(const NotifyPlayerLeft& acMessage) noexcept
     pArguments->SetInt(0, acMessage.PlayerId);
     pArguments->SetString(1, acMessage.Username.c_str());
     m_pOverlay->ExecuteAsync("playerDisconnected", pArguments);
+}
+
+void OverlayService::OnPlayerProfileImage(const NotifyPlayerProfileImage& acMessage) noexcept
+{
+    if (!m_pOverlay)
+        return;
+
+    auto pArguments = CefListValue::Create();
+    pArguments->SetInt(0, acMessage.PlayerId);
+    pArguments->SetString(1, acMessage.Avatar.c_str());
+    m_pOverlay->ExecuteAsync("playerAvatarUpdated", pArguments);
 }
 
 void OverlayService::OnPlayerLevel(const NotifyPlayerLevel& acMessage) noexcept
@@ -398,6 +624,31 @@ void OverlayService::OnPlayerCellChanged(const NotifyPlayerCellChanged& acMessag
     String cellName = GetCellName(acMessage.WorldSpaceId, acMessage.CellId);
     pArguments->SetString(1, cellName.c_str());
     m_pOverlay->ExecuteAsync("setCell", pArguments);
+}
+
+void OverlayService::OnNotifyTeleportRequest(const NotifyTeleportRequest& acMessage) noexcept
+{
+    if (!m_pOverlay)
+        return;
+
+    auto pArguments = CefListValue::Create();
+    pArguments->SetInt(0, acMessage.RequesterId);
+    pArguments->SetString(1, acMessage.RequesterName.c_str());
+    m_pOverlay->ExecuteAsync("teleportRequest", pArguments);
+}
+
+void OverlayService::OnNotifyTeleportCountdown(const NotifyTeleportCountdown& acMessage) noexcept
+{
+    if (!m_pOverlay)
+        return;
+
+    auto pArguments = CefListValue::Create();
+    pArguments->SetInt(0, acMessage.TargetPlayerId);
+    pArguments->SetString(1, acMessage.TargetName.c_str());
+    pArguments->SetInt(2, acMessage.DurationSeconds);
+    pArguments->SetBool(3, acMessage.Cancelled);
+    pArguments->SetString(4, acMessage.Reason.c_str());
+    m_pOverlay->ExecuteAsync("teleportCountdown", pArguments);
 }
 
 void OverlayService::OnNotifyTeleport(const NotifyTeleport& acMessage) noexcept
@@ -437,6 +688,96 @@ void OverlayService::OnNotifyPlayerHealthUpdate(const NotifyPlayerHealthUpdate& 
     m_pOverlay->ExecuteAsync("setHealth", pArguments);
 }
 
+namespace
+{
+std::string EscapeJson(std::string_view text)
+{
+    std::string out;
+    out.reserve(text.size() + 8);
+    for (char c : text)
+    {
+        switch (c)
+        {
+        case '\\': out += "\\\\"; break;
+        case '"': out += "\\\""; break;
+        case '\n': out += "\\n"; break;
+        case '\r': out += "\\r"; break;
+        case '\t': out += "\\t"; break;
+        default: out += c; break;
+        }
+    }
+    return out;
+}
+} // namespace
+
+void OverlayService::OnNotifyCommandList(const NotifyCommandList& acMessage) noexcept
+{
+    if (!m_pOverlay)
+        return;
+
+    std::string json = "[";
+    bool first = true;
+    for (const auto& command : acMessage.Commands)
+    {
+        if (!first)
+            json += ",";
+        first = false;
+        json += "{\"name\":\"";
+        json += EscapeJson(command.Name);
+        json += "\",\"description\":\"";
+        json += EscapeJson(command.Description);
+        json += "\"}";
+    }
+    json += "]";
+
+    auto pArguments = CefListValue::Create();
+    pArguments->SetString(0, json);
+    m_pOverlay->ExecuteAsync("commandList", pArguments);
+}
+
+void OverlayService::OnNotifyPlayEmote(const NotifyPlayEmote& acMessage) noexcept
+{
+    Actor* pActor = Utils::GetByServerId<Actor>(acMessage.ServerId);
+    if (!pActor)
+    {
+        spdlog::warn("{}: could not find actor server id {:X}", __FUNCTION__, acMessage.ServerId);
+        return;
+    }
+
+    if (pActor == PlayerCharacter::Get())
+        return;
+
+    if (acMessage.EventName.empty())
+        return;
+
+    pActor->SetWeaponDrawnEx(false);
+    BSFixedString eventName(acMessage.EventName.c_str());
+    pActor->SendAnimationEvent(&eventName);
+
+    auto& state = m_remoteEmotes[acMessage.ServerId];
+    state.EventName = acMessage.EventName;
+    state.LastPlayed = std::chrono::steady_clock::now();
+}
+
+void OverlayService::OnNotifyCancelEmote(const NotifyCancelEmote& acMessage) noexcept
+{
+    Actor* pActor = Utils::GetByServerId<Actor>(acMessage.ServerId);
+    if (!pActor)
+    {
+        spdlog::warn("{}: could not find actor server id {:X}", __FUNCTION__, acMessage.ServerId);
+        return;
+    }
+
+    if (pActor == PlayerCharacter::Get())
+        return;
+
+    BSFixedString stopInstant("IdleStopInstant");
+    BSFixedString stopEvent("IdleForceDefaultState");
+    pActor->SendAnimationEvent(&stopInstant);
+    pActor->SendAnimationEvent(&stopEvent);
+    m_remoteEmotes.erase(acMessage.ServerId);
+}
+
 void OverlayService::OnPartyJoinedEvent(const PartyJoinedEvent& acEvent) noexcept
 {
     if (acEvent.IsLeader)
@@ -463,8 +804,8 @@ void OverlayService::RunDebugDataUpdates() noexcept
     auto steamStats = m_transport.GetConnectionStatus();
 
     auto pArguments = CefListValue::Create();
-    pArguments->SetInt(0, steamStats.m_flOutPacketsPerSec);
-    pArguments->SetInt(1, steamStats.m_flInPacketsPerSec);
+    pArguments->SetInt(0, static_cast<int32_t>(steamStats.m_flOutPacketsPerSec));
+    pArguments->SetInt(1, static_cast<int32_t>(steamStats.m_flInPacketsPerSec));
     pArguments->SetInt(2, steamStats.m_nPing);
     pArguments->SetInt(3, 0);
     pArguments->SetInt(4, internalStats.SentBytes);
@@ -490,15 +831,56 @@ void OverlayService::RunPlayerHealthUpdates() noexcept
     lastSendTimePoint = now;
 
     static float s_previousPercentage = -1.f;
+    static int32_t s_previousLevel = -1;
 
-    const float newPercentage = CalculateHealthPercentage(PlayerCharacter::Get());
-    if (newPercentage == s_previousPercentage)
+    auto* pPlayer = PlayerCharacter::Get();
+    if (!pPlayer)
         return;
 
-    s_previousPercentage = newPercentage;
+    const float newPercentage = CalculateHealthPercentage(pPlayer);
+    const int32_t newLevel = static_cast<int32_t>(pPlayer->GetLevel());
 
-    RequestPlayerHealthUpdate request{};
-    request.Percentage = newPercentage;
+    const bool healthChanged = newPercentage != s_previousPercentage;
+    const bool levelChanged = newLevel != s_previousLevel;
 
-    m_transport.Send(request);
+    if (!healthChanged && !levelChanged)
+        return;
+
+    uint32_t localId = m_transport.GetLocalPlayerId();
+    if (localId == 0)
+    {
+        TryGetLocalServerId(localId);
+    }
+    const bool canUpdateUi = m_pOverlay && localId != 0;
+
+    if (levelChanged)
+    {
+        s_previousLevel = newLevel;
+
+        if (canUpdateUi)
+        {
+            auto pArguments = CefListValue::Create();
+            pArguments->SetInt(0, localId);
+            pArguments->SetInt(1, newLevel);
+            m_pOverlay->ExecuteAsync("setLevel", pArguments);
+        }
+    }
+
+    if (healthChanged)
+    {
+        s_previousPercentage = newPercentage;
+
+        if (canUpdateUi)
+        {
+            auto pArguments = CefListValue::Create();
+            pArguments->SetInt(0, localId);
+            pArguments->SetDouble(1, static_cast<double>(newPercentage));
+            m_pOverlay->ExecuteAsync("setHealth", pArguments);
+        }
+
+        RequestPlayerHealthUpdate request{};
+        request.Percentage = newPercentage;
+
+        m_transport.Send(request);
+    }
 }

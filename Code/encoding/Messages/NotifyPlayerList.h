@@ -18,7 +18,18 @@ struct NotifyPlayerList final : ServerMessage
     void SerializeRaw(TiltedPhoques::Buffer::Writer& aWriter) const noexcept override;
     void DeserializeRaw(TiltedPhoques::Buffer::Reader& aReader) noexcept override;
 
+    struct PlayerListEntry
+    {
+        String Name{};
+        String Avatar{};
+
+        bool operator==(const PlayerListEntry& aRhs) const noexcept
+        {
+            return Name == aRhs.Name && Avatar == aRhs.Avatar;
+        }
+    };
+
     bool operator==(const NotifyPlayerList& acRhs) const noexcept { return Players == acRhs.Players && GetOpcode() == acRhs.GetOpcode(); }
 
-    TiltedPhoques::Map<uint32_t, String> Players{};
+    TiltedPhoques::Map<uint32_t, PlayerListEntry> Players{};
 };
