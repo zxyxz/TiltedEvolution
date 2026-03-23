@@ -408,6 +408,15 @@ void MagicService::OnNotifyAddTarget(const NotifyAddTarget& acMessage) noexcept
         return;
     }
 
+    // This hack is here because slow time seems to be twice as slow when cast by an npc
+    if (pEffect->IsSlowEffect())
+    {
+        acMessage.CasterId && (pCaster = PlayerCharacter::Get());
+        spdlog::debug(
+            __FUNCTION__ ": hacking IsSlowEffect() targetId {:X}, casterId {:X}, magnitude {}, IsDualCasting {}", acMessage.TargetId, acMessage.CasterId, acMessage.Magnitude,
+            acMessage.IsDualCasting);
+    }
+
     MagicTarget::AddTargetData data{};
     data.pCaster = pCaster;
     data.pSpell = pSpell;

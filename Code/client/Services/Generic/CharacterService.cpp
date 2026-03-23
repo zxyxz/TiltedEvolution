@@ -142,6 +142,7 @@ bool CharacterService::TakeOwnership(const uint32_t acFormId, const uint32_t acS
     }
 
     pExtension->SetRemote(false);
+    pExtension->SetNakedDeadline();
 
     // TODO(cosideci): this should be done differently.
     // Send an ownership claim request, and have the server broadcast the result.
@@ -287,7 +288,7 @@ void CharacterService::OnDisconnected(const DisconnectedEvent& acDisconnectedEve
 
 void CharacterService::OnAssignCharacter(const AssignCharacterResponse& acMessage) noexcept
 {
-    spdlog::info("Received for cookie {:X}, server id {:X}", acMessage.Cookie, acMessage.ServerId);
+    spdlog::info(__FUNCTION__ ": Received for cookie {:X}, server id {:X}", acMessage.Cookie, acMessage.ServerId);
 
     auto view = m_world.view<WaitingForAssignmentComponent>();
     const auto itor = std::find_if(std::begin(view), std::end(view), [view, cookie = acMessage.Cookie](auto entity) { return view.get<WaitingForAssignmentComponent>(entity).Cookie == cookie; });
@@ -327,7 +328,7 @@ void CharacterService::OnAssignCharacter(const AssignCharacterResponse& acMessag
 
     if (acMessage.Owner)
     {
-        spdlog::info("Received local actor, form id: {:X}", pActor->formID);
+        spdlog::info(__FUNCTION__ ": received local actor, form id: {:X}, {}", pActor->formID, pActor->baseForm->GetName());
 
         m_world.emplace_or_replace<LocalComponent>(cEntity, acMessage.ServerId);
         auto& localAnimationComponent = m_world.emplace_or_replace<LocalAnimationComponent>(cEntity);
@@ -345,7 +346,7 @@ void CharacterService::OnAssignCharacter(const AssignCharacterResponse& acMessag
     }
     else
     {
-        spdlog::info("Received remote actor, form id: {:X}, isweapondrawn: {}", pActor->formID, acMessage.IsWeaponDrawn);
+        spdlog::info(__FUNCTION__ ": received remote actor, form id: {:X}, isweapondrawn: {}, {}", pActor->formID, acMessage.IsWeaponDrawn, pActor->baseForm->GetName());
 
         m_world.emplace_or_replace<RemoteComponent>(cEntity, acMessage.ServerId, formIdComponent->Id);
 
@@ -370,6 +371,7 @@ void CharacterService::OnAssignCharacter(const AssignCharacterResponse& acMessag
 
         MoveActor(pActor, acMessage.WorldSpaceId, acMessage.CellId, acMessage.Position);
     }
+    pActor->GetExtension()->SetNakedDeadline();
 }
 
 void CharacterService::OnCharacterSpawn(const CharacterSpawnRequest& acMessage) const noexcept
@@ -515,7 +517,7 @@ void CharacterService::OnRemoteSpawnDataReceived(const NotifySpawnData& acMessag
         {
             if (auto serverId = Utils::GetServerId(entity))
             {
-                if (*serverId == id)
+                if (serverId.has_value() && serverId.value() == id)
                     return true;
             }
             return false;
@@ -920,43 +922,78 @@ void CharacterService::OnDialogueEvent(const DialogueEvent& acEvent) noexcept
     if (!m_transport.IsConnected())
         return;
 
+    const bool isLeader = World::Get().GetPartyService().IsLeader(); // Helps distinguish in 2-party logs
     auto view = m_world.view<FormIdComponent>(entt::exclude<ObjectComponent>);
-    auto entityIt = std::find_if(view.begin(), view.end(), [view, formId = acEvent.ActorID](auto entity) { return view.get<FormIdComponent>(entity).Id == formId; });
+    auto entityIt = std::find_if(view.begin(), view.end(), [view, formId = acEvent.ActorID](auto entity) {
+        return view.get<FormIdComponent>(entity).Id == formId;
+    });
 
     if (entityIt == view.end())
+    {
+        spdlog::debug(__FUNCTION__ ": failed to find speaking Actor's FormIdComponent, formId {:X}, isLeader {}", acEvent.ActorID, isLeader);
         return;
+    }
 
     auto serverIdRes = Utils::GetServerId(*entityIt);
     if (!serverIdRes)
     {
-        spdlog::error("{}: server id not found for form id {:X}", __FUNCTION__, acEvent.ActorID);
+        spdlog::debug(__FUNCTION__ ": server id not found for formId {:X}, isLeader {}", acEvent.ActorID, isLeader);
         return;
     }
+    
+    Actor* pActor = Cast<Actor>(TESForm::GetById(acEvent.ActorID));
+    if (!pActor)
+        return;
 
-    DialogueRequest request{};
-    request.ServerId = serverIdRes.value();
-    request.SoundFilename = acEvent.VoiceFile;
+    bool isLocal = pActor->GetExtension()->IsLocal();
+    bool isInScene = pActor->IsInScene();
+    auto sceneId = isInScene ? pActor->GetCurrentScene()->formID : 0;
+    bool isTaskDialogue = pActor->IsTalking() && pActor->IsInDialogueWithPlayer();
+    bool isSpeakingInScene = pActor->IsSpeakingInScene();
 
-    m_transport.Send(request);
+    const bool willSync = isTaskDialogue || isLocal && !isInScene;
+
+    spdlog::debug(
+        __FUNCTION__ ": isLocal {}, isInScene {}, isSpeakingInScene {}, isTaskDialogue {}, willSync {}, scene {:X}, Actor "
+                     "{:X}, serverId {:X}, isLeader {}, name {}, soundFile {}",
+        isLocal, isInScene, isSpeakingInScene, isTaskDialogue, willSync, sceneId, pActor->formID, serverIdRes.value(), isLeader, pActor->baseForm->GetName(),
+        acEvent.VoiceFile);
+
+    if (willSync)
+    {
+        DialogueRequest request{};
+        request.ServerId = serverIdRes.value();
+        request.SoundFilename = acEvent.VoiceFile;
+
+        m_transport.Send(request);
+    }
 }
 
 void CharacterService::OnNotifyDialogue(const NotifyDialogue& acMessage) noexcept
 {
-    auto remoteView = m_world.view<RemoteComponent, FormIdComponent>();
-    const auto remoteIt = std::find_if(std::begin(remoteView), std::end(remoteView), [remoteView, Id = acMessage.ServerId](auto entity) { return remoteView.get<RemoteComponent>(entity).Id == Id; });
+    const bool isLeader = World::Get().GetPartyService().IsLeader(); // Helps distinguish in 2-party logs
+    auto view = m_world.view<FormIdComponent>(entt::exclude<ObjectComponent>);
+    auto viewIt = std::find_if(
+        view.begin(), view.end(),
+        [view, id = acMessage.ServerId](auto entity)
+        {
+            auto serverId = Utils::GetServerId(entity);
+            return serverId.has_value() && serverId.value() == id;
+        });
 
-    if (remoteIt == std::end(remoteView))
+    if (viewIt == view.end())
     {
-        spdlog::warn("Actor for dialogue with remote id {:X} not found.", acMessage.ServerId);
+        spdlog::debug(__FUNCTION__ ": failed to find speaking Actor's FormIdComponent, serverId {:X}, isLeader {}", acMessage.ServerId, isLeader);
         return;
     }
 
-    auto formIdComponent = remoteView.get<FormIdComponent>(*remoteIt);
-    const TESForm* pForm = TESForm::GetById(formIdComponent.Id);
-    Actor* pActor = Cast<Actor>(pForm);
-
+    Actor* pActor = Cast<Actor>(TESForm::GetById(view.get<FormIdComponent>(*viewIt).Id));
     if (!pActor)
         return;
+
+    spdlog::debug(
+        __FUNCTION__ ": playing dialogue Actor {:X}, serverId {:X}, isLeader {}, name {}, soundFile {}", pActor->formID, acMessage.ServerId, isLeader, pActor->baseForm->GetName(),
+        acMessage.SoundFilename);
 
     pActor->StopCurrentDialogue(true);
     pActor->SpeakSound(acMessage.SoundFilename.c_str());
@@ -967,42 +1004,70 @@ void CharacterService::OnSubtitleEvent(const SubtitleEvent& acEvent) noexcept
     if (!m_transport.IsConnected())
         return;
 
+    const bool isLeader = World::Get().GetPartyService().IsLeader(); // Helps distinguish in 2-party logs
     auto view = m_world.view<FormIdComponent>(entt::exclude<ObjectComponent>);
     auto entityIt = std::find_if(view.begin(), view.end(), [view, formId = acEvent.SpeakerID](auto entity) { return view.get<FormIdComponent>(entity).Id == formId; });
 
     if (entityIt == view.end())
+    {
+        spdlog::debug(__FUNCTION__ ": failed to find subtitle Actor's FormIdComponent, formId {:X}, isLeader {}", acEvent.SpeakerID, isLeader);
         return;
+    }
 
     auto serverIdRes = Utils::GetServerId(*entityIt);
     if (!serverIdRes)
     {
-        spdlog::error("{}: server id not found for form id {:X}", __FUNCTION__, acEvent.SpeakerID);
+        spdlog::debug(__FUNCTION__ ": server id not found for formId {:X}, isLeader {}", acEvent.SpeakerID, isLeader);
         return;
     }
 
-    SubtitleRequest request{};
-    request.ServerId = serverIdRes.value();
-    request.Text = acEvent.Text;
-    request.TopicFormId = acEvent.TopicFormID;
+    Actor* pActor = Cast<Actor>(TESForm::GetById(acEvent.SpeakerID));
+    if (!pActor)
+        return;
 
-    m_transport.Send(request);
+    bool isLocal = pActor->GetExtension()->IsLocal();
+    bool isInScene = pActor->IsInScene();
+    auto isSpeakingInScene = pActor->IsSpeakingInScene();
+    auto sceneId = isInScene ? pActor->GetCurrentScene()->formID : 0;
+    bool isTaskDialogue = pActor->IsTalking() && pActor->IsInDialogueWithPlayer();
+
+    const bool willSync = isTaskDialogue || isLocal && !isInScene;
+
+    spdlog::debug(
+        __FUNCTION__ ": isLocal {}, isInScene {}, isSpeakingInScene {}, isTaskDialogue {}, willSync {}, scene {:X}, Actor "
+                     "{:X}, serverId {:X}, isLeader {}, name {}, subtitle {}",
+        isLocal, isInScene, isSpeakingInScene, isTaskDialogue, willSync, sceneId, pActor->formID, serverIdRes.value(), isLeader, pActor->baseForm->GetName(),
+        acEvent.Text);
+
+    if (willSync)
+    {
+        SubtitleRequest request{};
+        request.ServerId = serverIdRes.value();
+        request.Text = acEvent.Text;
+        request.TopicFormId = acEvent.TopicFormID;
+        m_transport.Send(request);
+    }
 }
 
 void CharacterService::OnNotifySubtitle(const NotifySubtitle& acMessage) noexcept
 {
-    auto remoteView = m_world.view<RemoteComponent, FormIdComponent>();
-    const auto remoteIt = std::find_if(std::begin(remoteView), std::end(remoteView), [remoteView, Id = acMessage.ServerId](auto entity) { return remoteView.get<RemoteComponent>(entity).Id == Id; });
+    const bool isLeader = m_world.Get().GetPartyService().IsLeader();
+    auto view = m_world.view<FormIdComponent>(entt::exclude<ObjectComponent>);
+    auto viewIt = std::find_if(
+        view.begin(), view.end(),
+        [view, id = acMessage.ServerId](auto entity)
+        {
+            auto serverId = Utils::GetServerId(entity);
+            return serverId.has_value() && serverId.value() == id;
+        });
 
-    if (remoteIt == std::end(remoteView))
+    if (viewIt == view.end())
     {
-        spdlog::warn("Actor for dialogue with remote id {:X} not found.", acMessage.ServerId);
+        spdlog::debug(__FUNCTION__ ": failed to find subtitle Actor's FormIdComponent, serverId {:X}, isLeader {}", acMessage.ServerId, isLeader);
         return;
     }
 
-    auto formIdComponent = remoteView.get<FormIdComponent>(*remoteIt);
-    const TESForm* pForm = TESForm::GetById(formIdComponent.Id);
-    Actor* pActor = Cast<Actor>(pForm);
-
+    Actor* pActor = Cast<Actor>(TESForm::GetById(view.get<FormIdComponent>(*viewIt).Id));
     if (!pActor)
         return;
 
@@ -1010,6 +1075,10 @@ void CharacterService::OnNotifySubtitle(const NotifySubtitle& acMessage) noexcep
     TESTopicInfo* pInfo = nullptr;
     pInfo = Cast<TESTopicInfo>(TESForm::GetById(acMessage.TopicFormId));
 
+    spdlog::debug(__FUNCTION__ ": showing subtitle Actor {:X}, serverId {:X}, isLeader {}, name {}, message: {}",
+                     pActor->formID, acMessage.ServerId, isLeader, pActor->baseForm->GetName(), acMessage.Text);
+
+    SubtitleManager::Get()->HideSubtitle(pActor);   // Subtitle conflicts can hang, this makes it beter at least.
     SubtitleManager::Get()->ShowSubtitle(pActor, acMessage.Text.c_str(), pInfo);
 }
 
@@ -1292,7 +1361,8 @@ void CharacterService::RequestServerAssignment(const entt::entity aEntity) const
     message.LatestAction = pExtension->LatestAnimation;
     pActor->SaveAnimationVariables(message.LatestAction.Variables);
 
-    spdlog::info("Request id: {:X}, cookie: {:X}, entity: {:X}", formIdComponent.Id, sCookieSeed, to_integral(aEntity));
+    const bool isLeader = m_world.Get().GetPartyService().IsLeader(); // Distinguish logs in 2-party      
+    spdlog::info(__FUNCTION__ ": request id: {:X}, cookie: {:X}, entity: {:X}, isLeader: {}", formIdComponent.Id, sCookieSeed, to_integral(aEntity), isLeader);
 
     if (m_transport.Send(message))
     {
@@ -1304,10 +1374,11 @@ void CharacterService::RequestServerAssignment(const entt::entity aEntity) const
 
 void CharacterService::CancelServerAssignment(const entt::entity aEntity, const uint32_t aFormId) const noexcept
 {
+    Actor* pActor = Cast<Actor>(TESForm::GetById(aFormId));
+    const char* pName = !pActor ? "" : pActor->baseForm->GetName();
+
     if (m_world.all_of<RemoteComponent>(aEntity))
     {
-        Actor* pActor = Cast<Actor>(TESForm::GetById(aFormId));
-
         if (pActor)
         {
             if (pActor->IsTemporary())
@@ -1322,8 +1393,6 @@ void CharacterService::CancelServerAssignment(const entt::entity aEntity, const 
         }
 
         DeleteRemoteEntityComponents(aEntity);
-
-        return;
     }
 
     // In the event we were waiting for assignment, drop it
@@ -1346,7 +1415,7 @@ void CharacterService::CancelServerAssignment(const entt::entity aEntity, const 
         RequestOwnershipTransfer request{};
         request.ServerId = localComponent.Id;
 
-        if (Actor* pActor = Cast<Actor>(TESForm::GetById(aFormId)))
+        if (pActor)
         {
             if (!pActor->IsTemporary())
             {
@@ -1368,15 +1437,19 @@ void CharacterService::CancelServerAssignment(const entt::entity aEntity, const 
             }
         }
 
+
         spdlog::info(
-            "Transferring ownership of local actor, server id: {:X}, worldspace: {:X}, cell: {:X}, position: "
-            "({}, {}, {})",
-            request.ServerId, request.WorldSpaceId.BaseId, request.CellId.BaseId, request.Position.x, request.Position.y, request.Position.z);
+            __FUNCTION__ ": transferring ownership of local actor, formId: {:X}, server id: {:X}, worldspace: {:X}, cell: {:X}, position: "
+                         "({}, {}, {}), name: {}",
+            aFormId, request.ServerId, request.WorldSpaceId.BaseId, request.CellId.BaseId, request.Position.x, request.Position.y, request.Position.z, pName);
 
         m_transport.Send(request);
 
         m_world.remove<LocalAnimationComponent, LocalComponent>(aEntity);
     }
+
+    if (pActor)
+        pActor->GetExtension()->SetNakedDeadline();
 }
 
 Actor* CharacterService::CreateCharacterForEntity(entt::entity aEntity) const noexcept
@@ -1572,9 +1645,12 @@ void CharacterService::RunRemoteUpdates() noexcept
         if (pActor->IsVampireLord())
             pActor->FixVampireLordModel();
 
+        // (Re)start naked NPC deadline. Actor MUST be fully constructed before check clock starts.
+        pActor->GetExtension()->SetNakedDeadline();
+
         toRemove.push_back(entity);
 
-        spdlog::info("Applied 3D for actor, form id: {:X}", pActor->formID);
+        spdlog::info(__FUNCTION__ ": applied 3D for actor, form id: {:X}, name {}", pActor->formID, pActor->baseForm->GetName());
     }
 
     for (auto entity : toRemove)

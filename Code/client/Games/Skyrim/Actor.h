@@ -22,6 +22,7 @@ struct ActorExtension;
 struct AIProcess;
 struct CombatController;
 struct TESIdleForm;
+struct BGSOutfit;
 
 struct Actor : TESObjectREFR
 {
@@ -210,6 +211,12 @@ struct Actor : TESObjectREFR
     [[nodiscard]] bool IsWearingBodyPiece() const noexcept;
     [[nodiscard]] bool ShouldWearBodyPiece() const noexcept;
     [[nodiscard]] bool IsVampireLord() const noexcept;
+    [[nodiscard]] bool IsTalking() noexcept;
+    [[nodiscard]] bool IsInScene() noexcept;
+    [[nodiscard]] bool IsInDialogueWithPlayer() noexcept;
+    [[nodiscard]] float GetVoiceRecoveryTime() noexcept;
+    [[nodiscard]] bool IsSpeakingInScene();
+
 
     // Setters
     void SetSpeed(float aSpeed) noexcept;
@@ -243,7 +250,7 @@ struct Actor : TESObjectREFR
     void PickUpObject(TESObjectREFR* apObject, int32_t aCount, bool aUnk1, float aUnk2) noexcept;
     void DropObject(TESBoundObject* apObject, ExtraDataList* apExtraData, int32_t aCount, NiPoint3* apLocation, NiPoint3* apRotation) noexcept;
     void DropOrPickUpObject(const Inventory::Entry& arEntry, NiPoint3* apPoint, NiPoint3* apRotate) noexcept;
-    void SpeakSound(const char* pFile);
+    float SpeakSound(const char* pFile);
     void StartCombatEx(Actor* apTarget) noexcept;
     void SetCombatTargetEx(Actor* apTarget) noexcept;
     void StartCombat(Actor* apTarget) noexcept;
@@ -251,6 +258,14 @@ struct Actor : TESObjectREFR
     bool PlayIdle(TESIdleForm* apIdle) noexcept;
     void FixVampireLordModel() noexcept;
     bool RemoveSpell(MagicItem* apSpell) noexcept;
+    void SetOutfit(BGSOutfit* apOutfit, bool aIsSleepOutfit = false);
+    void EquipOutfit(bool aIsSleepOutfit = false) noexcept;
+
+    enum ActorBoolBits
+    {
+        kNone = 0,
+        kHasSceneExtra = 1 << 3,
+    };
 
     enum ActorFlags
     {
